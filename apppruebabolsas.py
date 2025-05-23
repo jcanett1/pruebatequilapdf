@@ -145,7 +145,6 @@ def create_part_numbers_summary(order_data):
     for oid, data in order_data.items():
         for part_num, qty in data.get("part_numbers", {}).items():
             part_upper = part_num.upper()
-            # Verifica si el número de parte está en nuestra lista objetivo
             if any(target_part in part_upper for target_part in TARGET_PARTS):
                 part_summary[part_upper] += qty
                 if data.get("shipment_id"):
@@ -159,46 +158,44 @@ def create_part_numbers_summary(order_data):
     y = 72
     
     # Encabezado
-    title = "Resumen de Números de Parte Especiales"
-    page.insert_text((72, y), title, fontsize=16)
+    page.insert_text(
+        point=(72, y),
+        text="Resumen de Números de Parte Especiales",
+        fontsize=16
+    )
     y += 30
     
     # Columnas
-    headers = ["Número de Parte", "Cantidad Total", "Envíos Asociados"]
-    page.insert_text((72, y), headers[0], fontsize=12)
-    page.insert_text((250, y), headers[1], fontsize=12)
-    page.insert_text((400, y), headers[2], fontsize=12)
+    page.insert_text(point=(72, y), text="Número de Parte", fontsize=12)
+    page.insert_text(point=(250, y), text="Cantidad Total", fontsize=12)
+    page.insert_text(point=(400, y), text="Envíos Asociados", fontsize=12)
     y += 20
     
     # Datos
     for part_num in sorted(part_summary.keys()):
-        if y > 770:  # Nueva página si se llega al final
+        if y > 770:
             page = doc.new_page(width=595, height=842)
             y = 72
         
-        # Número de parte
-        page.insert_text((72, y), part_num, fontsize=10)
+        page.insert_text(point=(72, y), text=part_num, fontsize=10)
+        page.insert_text(point=(250, y), text=str(part_summary[part_num]), fontsize=10)
         
-        # Cantidad total (suma de todas las apariciones)
-        total_qty = part_summary[part_num]
-        page.insert_text((250, y), str(total_qty), fontsize=10)
-        
-        # Envíos asociados (mostrar solo los primeros 3)
         shipments = sorted(associated_shipments.get(part_num, set()))
         shipments_text = ", ".join(shipments[:3])
         if len(shipments) > 3:
             shipments_text += f"... (+{len(shipments)-3} más)"
-        page.insert_text((400, y), shipments_text, fontsize=10)
+        page.insert_text(point=(400, y), text=shipments_text, fontsize=10)
         
         y += 15
     
-    # Total general (suma de todas las cantidades)
+    # Total general
     grand_total = sum(part_summary.values())
     page.insert_text(
-        (72, y + 20),
-        f"TOTAL GENERAL: {grand_total}",
+        point=(72, y + 20),
+        text=f"TOTAL GENERAL: {grand_total}",
         fontsize=14,
-        color=(1, 0, 0)  # Rojo para destacar
+        color=(1, 0, 0)
+    )
     
     return doc
 
