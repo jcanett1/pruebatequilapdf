@@ -28,7 +28,19 @@ def extract_part_numbers(text):
         quantity = int(quantity_match.group(1)) if quantity_match else 1
         part_numbers[part_num] = part_numbers.get(part_num, 0) + quantity
     return part_numbers
-
+    
+def insert_divider_page(doc, label):
+    """Crea una página divisoria con texto de etiqueta"""
+    page = doc.new_page()
+    text = f"=== {label.upper()} ==="
+    page.insert_text(
+        point=(72, 72),  # Posición (x,y) en puntos (1 pulgada = 72 puntos)
+        text=text,
+        fontsize=18,
+        fontname="helv",
+        color=(0, 0, 0)  # Color negro
+    )
+    
 def parse_pdf(file_bytes):
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     pages = []
