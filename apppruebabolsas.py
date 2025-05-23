@@ -179,56 +179,56 @@ def create_part_numbers_summary(order_data):
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     y = 72
-    
+
     # Encabezado mejorado
     headers = ["Código", "Descripción", "Apariciones", "Envíos"]
-    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv-bold")
-    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv-bold")
-    page.insert_text((400, y), headers[2], fontsize=12, fontname="helv-bold")
-    page.insert_text((480, y), headers[3], fontsize=12, fontname="helv-bold")
+    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv", set_simple=True)
+    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv", set_simple=True)
+    page.insert_text((400, y), headers[2], fontsize=12, fontname="helv", set_simple=True)
+    page.insert_text((480, y), headers[3], fontsize=12, fontname="helv", set_simple=True)
     y += 25
-    
+
     # Datos con descripciones completas
     for part_num in sorted(part_appearances.keys()):
         if y > 750:  # Nueva página antes de llegar al final
             page = doc.new_page(width=595, height=842)
             y = 72
-            
+
         # Código
         page.insert_text((50, y), part_num, fontsize=10)
-        
+
         # Descripción completa (con salto de línea si es muy larga)
         desc = PART_DESCRIPTIONS[part_num]
         if len(desc) > 40:  # Ajusta según necesidad
             page.insert_text((150, y), desc[:40], fontsize=9)
-            page.insert_text((150, y+12), desc[40:], fontsize=9)
+            page.insert_text((150, y + 12), desc[40:], fontsize=9)
         else:
             page.insert_text((150, y), desc, fontsize=10)
-        
+
         # Conteo
         page.insert_text((400, y), str(part_appearances[part_num]), fontsize=10)
-        
+
         # Envíos asociados
         shipments = sorted(associated_shipments.get(part_num, []))[:3]
         shipments_text = ", ".join(shipments) if shipments else "N/A"
         if len(associated_shipments.get(part_num, [])) > 3:
-            shipments_text += f"..."
+            shipments_text += "..."
+
         page.insert_text((480, y), shipments_text, fontsize=9)
-        
+
         y += 25 if len(desc) > 40 else 15  # Ajuste de espacio
-    
+
     # Total general
     total = sum(part_appearances.values())
     page.insert_text(
-        (50, y+20),
+        (50, y + 20),
         f"TOTAL GENERAL DE APARICIONES: {total}",
         fontsize=14,
         color=(0, 0, 1),  # Azul para destacar
-        fontname="helv-bold"
+        fontname="helv", set_simple=True
     )
-    
-    return doc
 
+    return doc
 # ... (el resto de las funciones permanecen iguales hasta merge_documents)
 
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
