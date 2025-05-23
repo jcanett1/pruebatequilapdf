@@ -60,7 +60,18 @@ def parse_pdf(file_bytes):
             "page": page,
             "parent": doc
         })
-    return pages
+return pages
+
+def get_build_order_list(build_pages):
+    """Obtiene una lista única de IDs de órdenes en el orden que aparecen."""
+    seen = set()
+    order = []
+    for p in build_pages:
+        oid = p["order_id"]
+        if oid and oid not in seen:
+            seen.add(oid)
+            order.append(oid)
+    return order
 
 def group_by_order(pages, classify_pickup=False):
     order_map = defaultdict(lambda: {"pages": [], "pickup": False, "part_numbers": defaultdict(int)})
