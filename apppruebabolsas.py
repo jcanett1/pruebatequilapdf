@@ -109,7 +109,11 @@ def create_part_numbers_summary(order_data):
         page.insert_text((72, y), part_num, fontsize=10)
         page.insert_text((250, y), str(data["quantity"]), fontsize=10)
         
-        shipments_text = ", ".join(sorted(data["shipments"])[:50] + ("..." if len(data["shipments"]) > 3 else "")
+        # Línea corregida:
+        shipments_text = ", ".join(sorted(data["shipments"])[:3])  # Mostrar solo 3 para no saturar
+        if len(data["shipments"]) > 3:
+            shipments_text += "..."
+            
         page.insert_text((350, y), shipments_text, fontsize=10)
         
         y += 15
