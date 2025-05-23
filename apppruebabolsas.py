@@ -60,7 +60,7 @@ def parse_pdf(file_bytes):
             "page": page,
             "parent": doc
         })
-return pages
+    return pages
 
 def get_build_order_list(build_pages):
     """Obtiene una lista única de IDs de órdenes en el orden que aparecen."""
