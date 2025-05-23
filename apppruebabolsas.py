@@ -35,7 +35,7 @@ def extract_part_numbers(text):
 
 
 # Lista completa de números de parte a buscar
-TARGET_PARTS = [
+PART_DESCRIPTIONS = {
     'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
     'B-PG-082-WHT': '2023 PXG Lightweight Cart Bag - White/Black',
     'B-PG-172': '2025 Stars & Stripes LW Carry Stand Bag',
@@ -61,7 +61,7 @@ TARGET_PARTS = [
     'B-PG-245-WHT': 'Deluxe Cart Bag B2 - White',
     'B-PG-246-POLY': 'Minimalist Carry Stand Bag - Black',
     'B-UGB8-EP': '2020 Carry Stand Bag- Black'
-]
+}
     
 def insert_divider_page(doc, label):
     """Crea una página divisoria con texto de etiqueta"""
