@@ -184,13 +184,15 @@ def create_part_numbers_summary(order_data):
     page.insert_text((450, y), headers[2], fontsize=12, fontname="helv", set_simple=True)
     y += 25
 
-    # Mostrar todas las partes definidas en PART_DESCRIPTIONS, incluso si su conteo es 0
-    for part_num in sorted(PART_DESCRIPTIONS.keys()):
+    # Mostrar solo partes con apariciones > 0
+    for part_num in sorted(part_appearances.keys()):
+        count = part_appearances[part_num]
+        if count == 0:
+            continue  # Saltar los que no aparecen
+
         if y > 750:
             page = doc.new_page(width=595, height=842)
             y = 72
-
-        count = part_appearances.get(part_num, 0)
 
         # Código
         page.insert_text((50, y), part_num, fontsize=10)
@@ -264,8 +266,8 @@ if build_file and ship_file and st.button("Generate Merged Output"):
     ship_pages = parse_pdf(ship_bytes)
 
     # Usar solo las páginas reales para generar all_meta
-    original_pages = build_pages + ship_pages
-    all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
+   original_pages = build_pages + ship_pages
+   all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
 
     # Generar mapas de build y shipment
     build_map = group_by_order(build_pages)
