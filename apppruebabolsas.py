@@ -20,17 +20,17 @@ def extract_identifiers(text):
     return order_id, shipment_id
 
 def extract_part_numbers(text):
-    """Extrae números de parte con búsqueda exacta y sensible al contexto"""
-    part_counts = {}
+    """Extrae pares (código, descripción) exactos definidos en PART_VARIANTS"""
+    part_counts = defaultdict(int)
     text_upper = text.upper()
-    
-    for part_num in PART_DESCRIPTIONS.keys():
-        # Búsqueda exacta considerando posibles espacios o guiones adicionales
-        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
-        count = len(re.findall(pattern, text_upper, re.IGNORECASE))
-        if count > 0:
-            part_counts[part_num] = part_counts.get(part_num, 0) + count
-    
+
+    for part_num, description in PART_VARIANTS:
+        pattern_code = fr'\b{re.escape(part_num)}\b'
+        pattern_desc = fr'\b{re.escape(description)}\b'
+
+        if re.search(pattern_code, text_upper) and re.search(pattern_desc, text_upper):
+            part_counts[(part_num, description)] += 1  # Contar 1 vez por página
+
     return part_counts
 
 
@@ -162,13 +162,12 @@ def group_by_order(pages, classify_pickup=False):
     return order_map
 
 def create_part_numbers_summary(order_data):
-    """Genera resumen con nombres completos y conteo de apariciones (solo los que aparecen al menos una vez)"""
+    """Genera resumen con código + descripción y conteo de apariciones"""
     part_appearances = defaultdict(int)
 
     for oid, data in order_data.items():
-        for part_num, count in data.get("part_numbers", {}).items():
-            if part_num in PART_DESCRIPTIONS:
-                part_appearances[part_num] += count
+        for (part_num, desc), count in data.get("part_numbers", {}).items():
+            part_appearances[(part_num, desc)] += count
 
     if not part_appearances:
         return None
@@ -177,24 +176,19 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    # Encabezado
     headers = ["Código", "Descripción", "Apariciones"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv", set_simple=True)
     page.insert_text((150, y), headers[1], fontsize=12, fontname="helv", set_simple=True)
     page.insert_text((450, y), headers[2], fontsize=12, fontname="helv", set_simple=True)
     y += 25
 
-    # Mostrar solo partes con apariciones > 0
-    for part_num in sorted(part_appearances.keys()):
-        count = part_appearances[part_num]
-        if count == 0:
-            continue
+    for (part_num, desc) in sorted(part_appearances.keys()):
+        count = part_appearances[(part_num, desc)]
 
         if y > 750:
             page = doc.new_page(width=595, height=842)
             y = 72
 
-        desc = PART_DESCRIPTIONS[part_num]
         page.insert_text((50, y), part_num, fontsize=10)
         if len(desc) > 40:
             page.insert_text((150, y), desc[:40], fontsize=9)
@@ -204,7 +198,6 @@ def create_part_numbers_summary(order_data):
         page.insert_text((450, y), str(count), fontsize=10)
         y += 25 if len(desc) > 40 else 15
 
-    # Total general
     total = sum(part_appearances.values())
     page.insert_text(
         (50, y+20),
