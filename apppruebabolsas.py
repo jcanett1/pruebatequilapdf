@@ -6,10 +6,7 @@ from collections import defaultdict
 ORDER_REGEX = re.compile(r'\b(SO-|USS|SOC|AMZ)-?(\d+)\b')
 SHIPMENT_REGEX = re.compile(r'\bSH(\d{5,})\b')
 PICKUP_REGEX = re.compile(r'Customer\s*Pickup|Cust\s*Pickup|CUSTPICKUP', re.IGNORECASE)
-PART_NUMBER_REGEX = re.compile(
-    r'\b(B-PG-081-BLK|B-PG-082-WHT|B-PG-172(-[A-Z]+)?|B-PG-173(-[A-Z]+)?|B-PG-244|B-PG-245(-[A-Z]+)?|B-PG-246-POLY|B-UGB8-EP)\b',
-    re.IGNORECASE
-)
+
 QUANTITY_REGEX = re.compile(r'(\d+)\s*(?:EA|PCS|PC|Each)', re.IGNORECASE)
 
 def extract_identifiers(text):
@@ -20,17 +17,15 @@ def extract_identifiers(text):
     return order_id, shipment_id
 
 def extract_part_numbers(text):
-    """Extrae pares (código, descripción) exactos definidos en PART_VARIANTS"""
-    part_counts = defaultdict(int)
+    """Extrae números de parte con coincidencia exacta y sin duplicados por página"""
+    part_counts = {}
     text_upper = text.upper()
-
-    for part_num, description in PART_VARIANTS:
-        pattern_code = fr'\b{re.escape(part_num)}\b'
-        pattern_desc = fr'\b{re.escape(description)}\b'
-
-        if re.search(pattern_code, text_upper) and re.search(pattern_desc, text_upper):
-            part_counts[(part_num, description)] += 1  # Contar 1 vez por página
-
+    
+    for part_num in PART_DESCRIPTIONS.keys():
+        # Busca coincidencias exactas (evita subcadenas)
+        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
+        if re.search(pattern, text_upper):
+            part_counts[part_num] = 1  # Contar solo 1 vez por página
     return part_counts
 
 
