@@ -259,9 +259,9 @@ if build_file and ship_file and st.button("Generate Merged Output"):
     build_pages = parse_pdf(build_bytes)
     ship_pages = parse_pdf(ship_bytes)
 
-    # Usar solo las páginas reales para generar all_meta
-   original_pages = build_pages + ship_pages
-   all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
+# Usar solo las páginas reales para generar all_meta
+    original_pages = build_pages + ship_pages
+    all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
 
     # Generar mapas de build y shipment
     build_map = group_by_order(build_pages)
