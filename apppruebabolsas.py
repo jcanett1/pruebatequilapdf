@@ -55,7 +55,7 @@ PART_DESCRIPTIONS = {
     'B-PG-245-BLK': 'Deluxe Cart Bag B2 - Black',
     'B-PG-245-WHT': 'Deluxe Cart Bag B2 - White',
     'B-PG-246-POLY': 'Minimalist Carry Stand Bag - Black',
-    'B-UGB8-EP': '2020 Carry Stand Bag- Black'
+    'B-UGB8-EP': '2020 Carry Stand Bag - Black'
 }
     
 def insert_divider_page(doc, label):
