@@ -164,15 +164,12 @@ def group_by_order(pages, classify_pickup=False):
 def create_part_numbers_summary(order_data):
     """Genera resumen con nombres completos y conteo de apariciones"""
     part_appearances = defaultdict(int)
-    associated_shipments = defaultdict(set)
-    
+
     for oid, data in order_data.items():
         for part_num, count in data.get("part_numbers", {}).items():
             if part_num in PART_DESCRIPTIONS:
                 part_appearances[part_num] += count
-                if data.get("shipment_id"):
-                    associated_shipments[part_num].add(data["shipment_id"])
-    
+
     if not part_appearances:
         return None
 
@@ -180,41 +177,34 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    # Encabezado mejorado
-    headers = ["Código", "Descripción", "Apariciones", "Envíos"]
+    # Encabezado
+    headers = ["Código", "Descripción", "Apariciones"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv", set_simple=True)
     page.insert_text((150, y), headers[1], fontsize=12, fontname="helv", set_simple=True)
-    page.insert_text((400, y), headers[2], fontsize=12, fontname="helv", set_simple=True)
-    page.insert_text((480, y), headers[3], fontsize=12, fontname="helv", set_simple=True)
+    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv", set_simple=True)
     y += 25
 
-    # Datos con descripciones completas
-    for part_num in sorted(part_appearances.keys()):
-        if y > 750:  # Nueva página antes de llegar al final
+    # Mostrar todas las partes definidas en PART_DESCRIPTIONS, incluso si su conteo es 0
+    for part_num in sorted(PART_DESCRIPTIONS.keys()):
+        if y > 750:
             page = doc.new_page(width=595, height=842)
             y = 72
+
+        count = part_appearances.get(part_num, 0)
 
         # Código
         page.insert_text((50, y), part_num, fontsize=10)
 
         # Descripción completa (con salto de línea si es muy larga)
         desc = PART_DESCRIPTIONS[part_num]
-        if len(desc) > 40:  # Ajusta según necesidad
+        if len(desc) > 40:
             page.insert_text((150, y), desc[:40], fontsize=9)
             page.insert_text((150, y + 12), desc[40:], fontsize=9)
         else:
             page.insert_text((150, y), desc, fontsize=10)
 
-        # Conteo
-        page.insert_text((400, y), str(part_appearances[part_num]), fontsize=10)
-
-        # Envíos asociados
-        shipments = sorted(associated_shipments.get(part_num, []))[:3]
-        shipments_text = ", ".join(shipments) if shipments else "N/A"
-        if len(associated_shipments.get(part_num, [])) > 3:
-            shipments_text += "..."
-
-        page.insert_text((480, y), shipments_text, fontsize=9)
+        # Apariciones
+        page.insert_text((450, y), str(count), fontsize=10)
 
         y += 25 if len(desc) > 40 else 15  # Ajuste de espacio
 
@@ -225,7 +215,8 @@ def create_part_numbers_summary(order_data):
         f"TOTAL GENERAL DE APARICIONES: {total}",
         fontsize=14,
         color=(0, 0, 1),  # Azul para destacar
-        fontname="helv", set_simple=True
+        fontname="helv",
+        set_simple=True
     )
 
     return doc
@@ -269,15 +260,14 @@ if build_file and ship_file and st.button("Generate Merged Output"):
     build_bytes = build_file.read()
     ship_bytes = ship_file.read()
 
-    # Extraer páginas de los documentos originales
     build_pages = parse_pdf(build_bytes)
     ship_pages = parse_pdf(ship_bytes)
 
-    # Usar solo las páginas originales para crear all_meta
+    # Usar solo las páginas reales para generar all_meta
     original_pages = build_pages + ship_pages
     all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
 
-    # Crear mapas de build y shipment
+    # Generar mapas de build y shipment
     build_map = group_by_order(build_pages)
     ship_map = group_by_order(ship_pages)
 
@@ -288,10 +278,10 @@ if build_file and ship_file and st.button("Generate Merged Output"):
     summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
     merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag)
 
-    # Insertar resumen AL FINAL o AL PRINCIPIO según desees
-    merged.insert_pdf(summary)  # Al final por claridad visual
+    # Insertar resumen al inicio
+    merged.insert_pdf(summary, start_at=0)
 
-    # Descargar
+    # Botón de descarga
     st.download_button(
         "Download Merged Output PDF",
         data=merged.tobytes(),
