@@ -21,10 +21,10 @@ def extract_identifiers(text):
 
 def extract_part_numbers(text):
     part_numbers = {}
-    for match in PART_NUMBER_REGEX.finditer(text):
+    for match in PART_NUMBER_REGEX.finditer(text.upper()):  # Buscar en mayúsculas
         part_num = match.group(0).upper()
-        # Buscar la cantidad asociada cerca del número de parte
-        quantity_match = QUANTITY_REGEX.search(text[max(0, match.start()-50):match.end()+50])
+        # Buscar cantidad cerca del número de parte
+        quantity_match = re.search(r'(\d+)\s*(?:EA|PCS|PC|Each)', text, re.IGNORECASE)
         quantity = int(quantity_match.group(1)) if quantity_match else 1
         part_numbers[part_num] = part_numbers.get(part_num, 0) + quantity
     return part_numbers
@@ -128,50 +128,77 @@ def group_by_order(pages, classify_pickup=False):
     return order_map
 
 def create_part_numbers_summary(order_data):
-    part_summary = defaultdict(lambda: {"quantity": 0, "shipments": set()})
+    """Crea un resumen preciso de números de parte especiales con sus cantidades totales"""
+    part_summary = defaultdict(int)  # {part_number: total_quantity}
+    associated_shipments = defaultdict(set)  # {part_number: set(shipment_ids)}
     
+    # Definición completa de números de parte a buscar
+    TARGET_PARTS = {
+        'B-PG-081-BLK', 'B-PG-082-WHT', 'B-PG-172', 'B-PG-172-BGRY',
+        'B-PG-172-BLACK', 'B-PG-172-DB', 'B-PG-172-DKNSS', 'B-PG-172-DW',
+        'B-PG-172-GREEN', 'B-PG-172-GREY', 'B-PG-172-NAVY', 'B-PG-172-TAN',
+        'B-PG-172-WBLK', 'B-PG-173', 'B-PG-173-BGRY', 'B-PG-173-BO',
+        'B-PG-173-DKNSS', 'B-PG-173-WBLK', 'B-PG-173-WO', 'B-PG-244',
+        'B-PG-245', 'B-PG-245-BLK', 'B-PG-245-WHT', 'B-PG-246-POLY', 'B-UGB8-EP'
+    }
+
     for oid, data in order_data.items():
-        for part_num, qty in data["part_numbers"].items():
-            part_summary[part_num]["quantity"] += qty
-            if "shipment_id" in data:
-                part_summary[part_num]["shipments"].add(data["shipment_id"])
-    
+        for part_num, qty in data.get("part_numbers", {}).items():
+            part_upper = part_num.upper()
+            # Verifica si el número de parte está en nuestra lista objetivo
+            if any(target_part in part_upper for target_part in TARGET_PARTS):
+                part_summary[part_upper] += qty
+                if data.get("shipment_id"):
+                    associated_shipments[part_upper].add(data["shipment_id"])
+
     if not part_summary:
         return None
-    
+
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     y = 72
     
-    title = "Special Part Numbers Summary"
+    # Encabezado
+    title = "Resumen de Números de Parte Especiales"
     page.insert_text((72, y), title, fontsize=16)
     y += 30
     
-    headers = ["Part Number", "Total Quantity", "Associated Shipments"]
+    # Columnas
+    headers = ["Número de Parte", "Cantidad Total", "Envíos Asociados"]
     page.insert_text((72, y), headers[0], fontsize=12)
     page.insert_text((250, y), headers[1], fontsize=12)
-    page.insert_text((350, y), headers[2], fontsize=12)
+    page.insert_text((400, y), headers[2], fontsize=12)
     y += 20
     
-    for part_num, data in sorted(part_summary.items()):
-        if y > 770:
+    # Datos
+    for part_num in sorted(part_summary.keys()):
+        if y > 770:  # Nueva página si se llega al final
             page = doc.new_page(width=595, height=842)
             y = 72
         
+        # Número de parte
         page.insert_text((72, y), part_num, fontsize=10)
-        page.insert_text((250, y), str(data["quantity"]), fontsize=10)
         
-        # Línea corregida:
-        shipments_text = ", ".join(sorted(data["shipments"])[:3])  # Mostrar solo 3 para no saturar
-        if len(data["shipments"]) > 3:
-            shipments_text += "..."
-            
-        page.insert_text((350, y), shipments_text, fontsize=10)
+        # Cantidad total (suma de todas las apariciones)
+        total_qty = part_summary[part_num]
+        page.insert_text((250, y), str(total_qty), fontsize=10)
+        
+        # Envíos asociados (mostrar solo los primeros 3)
+        shipments = sorted(associated_shipments.get(part_num, set()))
+        shipments_text = ", ".join(shipments[:3])
+        if len(shipments) > 3:
+            shipments_text += f"... (+{len(shipments)-3} más)"
+        page.insert_text((400, y), shipments_text, fontsize=10)
         
         y += 15
     
-    total_line = f"GRAND TOTAL: {sum(data['quantity'] for data in part_summary.values())}"
-    page.insert_text((72, y+20), total_line, fontsize=14, fontname="helv", color=(1, 0, 0))
+    # Total general (suma de todas las cantidades)
+    grand_total = sum(part_summary.values())
+    page.insert_text(
+        (72, y + 20),
+        f"TOTAL GENERAL: {grand_total}",
+        fontsize=14,
+        color=(1, 0, 0)  # Rojo para destacar
     
     return doc
 
