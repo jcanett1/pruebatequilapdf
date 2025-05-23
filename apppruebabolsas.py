@@ -57,9 +57,7 @@ PART_PAIRS = [
     ('B-PG-246-POLY', 'Minimalist Carry Stand Bag - Black'),
     ('B-UGB8-EP', '2020 Carry Stand Bag - Black')
 ]
-DESCRIPTION_TO_CODE = {
-    desc: code for code, desc in PART_DESCRIPTIONS.items()
-}
+
 
 def insert_divider_page(doc, label):
     """Crea una página divisoria con texto de etiqueta"""
