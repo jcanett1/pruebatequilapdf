@@ -20,14 +20,27 @@ def extract_identifiers(text):
     return order_id, shipment_id
 
 def extract_part_numbers(text):
-    part_numbers = {}
-    for match in PART_NUMBER_REGEX.finditer(text.upper()):  # Buscar en mayúsculas
-        part_num = match.group(0).upper()
-        # Buscar cantidad cerca del número de parte
-        quantity_match = re.search(r'(\d+)\s*(?:EA|PCS|PC|Each)', text, re.IGNORECASE)
-        quantity = int(quantity_match.group(1)) if quantity_match else 1
-        part_numbers[part_num] = part_numbers.get(part_num, 0) + quantity
-    return part_numbers
+    """Extrae los números de parte y cuenta apariciones (no cantidades)"""
+    part_counts = {}
+    text_upper = text.upper()
+    
+    # Busca todos los números de parte en el texto
+    for part_num in TARGET_PARTS:
+        count = len(re.findall(r'\b' + re.escape(part_num) + r'\b', text_upper)
+        if count > 0:
+            part_counts[part_num] = part_counts.get(part_num, 0) + count
+    
+    return part_counts
+
+# Lista completa de números de parte a buscar
+TARGET_PARTS = [
+    'B-PG-081-BLK', 'B-PG-082-WHT', 'B-PG-172', 'B-PG-172-BGRY',
+    'B-PG-172-BLACK', 'B-PG-172-DB', 'B-PG-172-DKNSS', 'B-PG-172-DW',
+    'B-PG-172-GREEN', 'B-PG-172-GREY', 'B-PG-172-NAVY', 'B-PG-172-TAN',
+    'B-PG-172-WBLK', 'B-PG-173', 'B-PG-173-BGRY', 'B-PG-173-BO',
+    'B-PG-173-DKNSS', 'B-PG-173-WBLK', 'B-PG-173-WO', 'B-PG-244',
+    'B-PG-245', 'B-PG-245-BLK', 'B-PG-245-WHT', 'B-PG-246-POLY', 'B-UGB8-EP'
+]
     
 def insert_divider_page(doc, label):
     """Crea una página divisoria con texto de etiqueta"""
@@ -128,29 +141,18 @@ def group_by_order(pages, classify_pickup=False):
     return order_map
 
 def create_part_numbers_summary(order_data):
-    """Crea un resumen preciso de números de parte especiales con sus cantidades totales"""
-    part_summary = defaultdict(int)  # {part_number: total_quantity}
+    """Crea resumen contando apariciones (no sumando cantidades)"""
+    part_appearances = defaultdict(int)  # {part_number: conteo_apariciones}
     associated_shipments = defaultdict(set)  # {part_number: set(shipment_ids)}
     
-    # Definición completa de números de parte a buscar
-    TARGET_PARTS = {
-        'B-PG-081-BLK', 'B-PG-082-WHT', 'B-PG-172', 'B-PG-172-BGRY',
-        'B-PG-172-BLACK', 'B-PG-172-DB', 'B-PG-172-DKNSS', 'B-PG-172-DW',
-        'B-PG-172-GREEN', 'B-PG-172-GREY', 'B-PG-172-NAVY', 'B-PG-172-TAN',
-        'B-PG-172-WBLK', 'B-PG-173', 'B-PG-173-BGRY', 'B-PG-173-BO',
-        'B-PG-173-DKNSS', 'B-PG-173-WBLK', 'B-PG-173-WO', 'B-PG-244',
-        'B-PG-245', 'B-PG-245-BLK', 'B-PG-245-WHT', 'B-PG-246-POLY', 'B-UGB8-EP'
-    }
-
     for oid, data in order_data.items():
-        for part_num, qty in data.get("part_numbers", {}).items():
-            part_upper = part_num.upper()
-            if any(target_part in part_upper for target_part in TARGET_PARTS):
-                part_summary[part_upper] += qty
+        for part_num, count in data.get("part_numbers", {}).items():
+            if part_num in TARGET_PARTS:
+                part_appearances[part_num] += count
                 if data.get("shipment_id"):
-                    associated_shipments[part_upper].add(data["shipment_id"])
-
-    if not part_summary:
+                    associated_shipments[part_num].add(data["shipment_id"])
+    
+    if not part_appearances:
         return None
 
     doc = fitz.open()
@@ -158,41 +160,35 @@ def create_part_numbers_summary(order_data):
     y = 72
     
     # Encabezado
-    page.insert_text(
-        point=(72, y),
-        text="Resumen de Números de Parte Especiales",
-        fontsize=16
-    )
+    page.insert_text((72, y), "RESUMEN DE APARICIONES DE BOLSAS", fontsize=16)
     y += 30
-    
-    # Columnas
-    page.insert_text(point=(72, y), text="Número de Parte", fontsize=12)
-    page.insert_text(point=(250, y), text="Cantidad Total", fontsize=12)
-    page.insert_text(point=(400, y), text="Envíos Asociados", fontsize=12)
+    page.insert_text((72, y), "Número de Parte", fontsize=12)
+    page.insert_text((250, y), "Veces que aparece", fontsize=12)
+    page.insert_text((400, y), "Envíos asociados", fontsize=12)
     y += 20
     
     # Datos
-    for part_num in sorted(part_summary.keys()):
+    for part_num in sorted(part_appearances.keys()):
         if y > 770:
             page = doc.new_page(width=595, height=842)
             y = 72
+            
+        page.insert_text((72, y), part_num, fontsize=10)
+        page.insert_text((250, y), str(part_appearances[part_num]), fontsize=10)
         
-        page.insert_text(point=(72, y), text=part_num, fontsize=10)
-        page.insert_text(point=(250, y), text=str(part_summary[part_num]), fontsize=10)
-        
-        shipments = sorted(associated_shipments.get(part_num, set()))
-        shipments_text = ", ".join(shipments[:3])
-        if len(shipments) > 3:
-            shipments_text += f"... (+{len(shipments)-3} más)"
-        page.insert_text(point=(400, y), text=shipments_text, fontsize=10)
+        shipments = sorted(associated_shipments.get(part_num, []))[:3]
+        shipments_text = ", ".join(shipments)
+        if len(associated_shipments.get(part_num, [])) > 3:
+            shipments_text += f"... (+{len(associated_shipments[part_num])-3} más)"
+        page.insert_text((400, y), shipments_text, fontsize=10)
         
         y += 15
     
-    # Total general
-    grand_total = sum(part_summary.values())
+    # Total general (suma de todas las apariciones)
+    total_apariciones = sum(part_appearances.values())
     page.insert_text(
-        point=(72, y + 20),
-        text=f"TOTAL GENERAL: {grand_total}",
+        (72, y + 20),
+        f"TOTAL DE APARICIONES: {total_apariciones}",
         fontsize=14,
         color=(1, 0, 0)
     )
