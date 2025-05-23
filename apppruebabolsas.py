@@ -208,14 +208,14 @@ def create_part_numbers_summary(order_data):
 # ... (el resto de las funciones permanecen iguales hasta merge_documents)
 
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
-   doc = fitz.open()
-   pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
+    doc = fitz.open()
+    pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
 
-  # Insertar resumen de números de parte especiales al principio
-   part_summary = create_part_numbers_summary(order_meta)
-   if part_summary:
-    doc.insert_pdf(part_summary)
-    insert_divider_page(doc, "Main Documents")
+    # Insertar resumen de números de parte especiales al principio
+    part_summary = create_part_numbers_summary(order_meta)
+    if part_summary:
+        doc.insert_pdf(part_summary)
+        insert_divider_page(doc, "Main Documents")
 
     if pickup_flag and pickups:
         insert_divider_page(doc, "Customer Pickup Orders")
@@ -231,6 +231,7 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
             doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
         for p in ship_map.get(oid, {}).get("pages", []):
             doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
+
     return doc
 
 # Streamlit UI (permanece igual)
