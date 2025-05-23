@@ -62,6 +62,35 @@ def parse_pdf(file_bytes):
         })
     return pages
 
+def create_summary_page(order_data, build_keys, shipment_keys, pickup_flag):
+    all_orders = set(build_keys) | set(shipment_keys)
+    unmatched_build = set(build_keys) - set(shipment_keys)
+    unmatched_ship = set(shipment_keys) - set(build_keys)
+    pickup_orders = [oid for oid in all_orders if order_data[oid]["pickup"]] if pickup_flag else []
+
+    lines = [
+        "Tequila Order Summary",
+        "",
+        f"Total Unique Orders: {len(all_orders)}",
+        f"Orders with Build Sheets Only: {len(unmatched_build)}",
+        f"Orders with Shipments Only: {len(unmatched_ship)}",
+        f"Orders with Both: {len(all_orders) - len(unmatched_build) - len(unmatched_ship)}"
+    ]
+    if pickup_flag:
+        lines.append(f"Customer Pickup Orders: {len(pickup_orders)}")
+
+    summary_doc = fitz.open()
+    y = 72
+    page = summary_doc.new_page(width=595, height=842)
+    for line in lines:
+        if y > 770:
+            page = summary_doc.new_page(width=595, height=842)
+            y = 72
+        page.insert_text((72, y), line, fontsize=12)
+        y += 14
+    return summary_doc
+
+
 def get_build_order_list(build_pages):
     """Obtiene una lista única de IDs de órdenes en el orden que aparecen."""
     seen = set()
