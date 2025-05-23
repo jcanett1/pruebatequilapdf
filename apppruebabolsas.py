@@ -3,12 +3,13 @@ import fitz  # PyMuPDF
 import re
 from collections import defaultdict
 
+# === Expresiones regulares ===
 ORDER_REGEX = re.compile(r'\b(SO-|USS|SOC|AMZ)-?(\d+)\b')
 SHIPMENT_REGEX = re.compile(r'\bSH(\d{5,})\b')
 PICKUP_REGEX = re.compile(r'Customer\s*Pickup|Cust\s*Pickup|CUSTPICKUP', re.IGNORECASE)
-
 QUANTITY_REGEX = re.compile(r'(\d+)\s*(?:EA|PCS|PC|Each)', re.IGNORECASE)
 
+# === Funciones auxiliares ===
 def extract_identifiers(text):
     order_match = ORDER_REGEX.search(text)
     shipment_match = SHIPMENT_REGEX.search(text)
@@ -16,47 +17,46 @@ def extract_identifiers(text):
     shipment_id = f"SH{shipment_match.group(1)}" if shipment_match else None
     return order_id, shipment_id
 
+
 def extract_part_numbers(text):
-    """Extrae números de parte completos (código + descripción)"""
-    part_counts = defaultdict(int)
+    """Extrae números de parte con coincidencia exacta y sin duplicados por página"""
+    part_counts = {}
     text_upper = text.upper()
-
-    for full_part in FULL_PART_STRINGS:
-        pattern = r'(?<!\w)' + re.escape(full_part) + r'(?!\w)'
-        if re.search(pattern, text_upper, re.IGNORECASE):
-            part_counts[full_part] += 1  # Contar solo 1 vez por página
-
+    for part_num in PART_DESCRIPTIONS.keys():
+        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
+        if re.search(pattern, text_upper):
+            part_counts[part_num] = 1  # Contar solo 1 vez por página
     return part_counts
 
 
-# Lista completa de números de parte a buscar
-FULL_PART_STRINGS = [
-    "B-PG-081-BLK 2023 PXG Deluxe Cart Bag - Black",
-    "B-PG-082-WHT 2023 PXG Lightweight Cart Bag - White/Black",
-    "B-PG-172 2025 Stars & Stripes LW Carry Stand Bag",
-    "B-PG-172-BGRY Xtreme Carry Stand Bag - Black",
-    "B-PG-172-BLACK Xtreme Carry Stand Bag - Freedom - Black",
-    "B-PG-172-DB Deluxe Carry Stand Bag - Black",
-    "B-PG-172-DKNSS Deluxe Carry Stand Bag - Darkness",
-    "B-PG-172-DW Deluxe Carry Stand Bag - White",
-    "B-PG-172-GREEN Xtreme Carry Stand Bag - Freedom - Green",
-    "B-PG-172-GREY Xtreme Carry Stand Bag - Freedom - Grey",
-    "B-PG-172-NAVY Xtreme Carry Stand Bag - Freedom - Navy",
-    "B-PG-172-TAN Xtreme Carry Stand Bag - Freedom - Tan",
-    "B-PG-172-WBLK Xtreme Carry Stand Bag - White",
-    "B-PG-173 2025 Stars & Stripes Hybrid Stand Bag",
-    "B-PG-173-BGRY Xtreme Hybrid Stand Bag - Black",
-    "B-PG-173-BO Deluxe Hybrid Stand Bag - Black",
-    "B-PG-173-DKNSS Deluxe Hybrid Stand Bag - Darkness",
-    "B-PG-173-WBLK Xtreme Hybrid Stand Bag - White",
-    "B-PG-173-WO Deluxe Hybrid Stand Bag - White",
-    "B-PG-244 Xtreme Cart Bag - White",
-    "B-PG-245 2025 Stars & Stripes Cart Bag",
-    "B-PG-245-BLK Deluxe Cart Bag B2 - Black",
-    "B-PG-245-WHT Deluxe Cart Bag B2 - White",
-    "B-PG-246-POLY Minimalist Carry Stand Bag - Black",
-    "B-UGB8-EP 2020 Carry Stand Bag - Black"
-]
+# === Definición correcta de partes (diccionario) ===
+PART_DESCRIPTIONS = {
+    'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
+    'B-PG-082-WHT': '2023 PXG Lightweight Cart Bag - White/Black',
+    'B-PG-172': '2025 Stars & Stripes LW Carry Stand Bag',
+    'B-PG-172-BGRY': 'Xtreme Carry Stand Bag - Black',
+    'B-PG-172-BLACK': 'Xtreme Carry Stand Bag - Freedom - Black',
+    'B-PG-172-DB': 'Deluxe Carry Stand Bag - Black',
+    'B-PG-172-DKNSS': 'Deluxe Carry Stand Bag - Darkness',
+    'B-PG-172-DW': 'Deluxe Carry Stand Bag - White',
+    'B-PG-172-GREEN': 'Xtreme Carry Stand Bag - Freedom - Green',
+    'B-PG-172-GREY': 'Xtreme Carry Stand Bag - Freedom - Grey',
+    'B-PG-172-NAVY': 'Xtreme Carry Stand Bag - Freedom - Navy',
+    'B-PG-172-TAN': 'Xtreme Carry Stand Bag - Freedom - Tan',
+    'B-PG-172-WBLK': 'Xtreme Carry Stand Bag - White',
+    'B-PG-173': '2025 Stars & Stripes Hybrid Stand Bag',
+    'B-PG-173-BGRY': 'Xtreme Hybrid Stand Bag - Black',
+    'B-PG-173-BO': 'Deluxe Hybrid Stand Bag - Black',
+    'B-PG-173-DKNSS': 'Deluxe Hybrid Stand Bag - Darkness',
+    'B-PG-173-WBLK': 'Xtreme Hybrid Stand Bag - White',
+    'B-PG-173-WO': 'Deluxe Hybrid Stand Bag - White',
+    'B-PG-244': 'Xtreme Cart Bag - White',
+    'B-PG-245': '2025 Stars & Stripes Cart Bag',
+    'B-PG-245-BLK': 'Deluxe Cart Bag B2 - Black',
+    'B-PG-245-WHT': 'Deluxe Cart Bag B2 - White',
+    'B-PG-246-POLY': 'Minimalist Carry Stand Bag - Black',
+    'B-UGB8-EP': '2020 Carry Stand Bag - Black'
+}
 
 
 def insert_divider_page(doc, label):
@@ -64,14 +64,16 @@ def insert_divider_page(doc, label):
     page = doc.new_page()
     text = f"=== {label.upper()} ==="
     page.insert_text(
-        point=(72, 72),  # Posición (x,y) en puntos (1 pulgada = 72 puntos)
+        point=(72, 72),
         text=text,
         fontsize=18,
         fontname="helv",
-        color=(0, 0, 0)  # Color negro
+        color=(0, 0, 0)
     )
-    
+
+
 def parse_pdf(file_bytes):
+    """Parsea un archivo PDF y devuelve sus páginas con metadatos"""
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     pages = []
     last_order_id = None
@@ -102,7 +104,9 @@ def parse_pdf(file_bytes):
             "page": page,
             "parent": doc
         })
+
     return pages
+
 
 def create_summary_page(order_data, build_keys, shipment_keys, pickup_flag):
     all_orders = set(build_keys) | set(shipment_keys)
@@ -134,7 +138,6 @@ def create_summary_page(order_data, build_keys, shipment_keys, pickup_flag):
 
 
 def get_build_order_list(build_pages):
-    """Obtiene una lista única de IDs de órdenes en el orden que aparecen."""
     seen = set()
     order = []
     for p in build_pages:
@@ -143,6 +146,7 @@ def get_build_order_list(build_pages):
             seen.add(oid)
             order.append(oid)
     return order
+
 
 def group_by_order(pages, classify_pickup=False):
     order_map = defaultdict(lambda: {"pages": [], "pickup": False, "part_numbers": defaultdict(int)})
@@ -157,14 +161,15 @@ def group_by_order(pages, classify_pickup=False):
             order_map[oid]["part_numbers"][part_num] += qty
     return order_map
 
+
 def create_part_numbers_summary(order_data):
-    """Genera resumen con código + descripción y conteo de apariciones"""
     part_appearances = defaultdict(int)
 
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
-        for full_part, count in part_numbers.items():
-            part_appearances[full_part] += count
+        for part_num, count in part_numbers.items():
+            if part_num in PART_DESCRIPTIONS:
+                part_appearances[part_num] += count
 
     if not part_appearances:
         return None
@@ -173,26 +178,31 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    headers = ["Código + Descripción", "Apariciones"]
+    headers = ["Código", "Descripción", "Apariciones"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv", set_simple=True)
-    page.insert_text((450, y), headers[1], fontsize=12, fontname="helv", set_simple=True)
+    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv", set_simple=True)
+    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv", set_simple=True)
     y += 25
 
-    for full_part in sorted(part_appearances.keys()):
-        count = part_appearances[full_part]
-
+    for part_num in sorted(part_appearances.keys()):
+        count = part_appearances[part_num]
+        if count == 0:
+            continue
         if y > 750:
             page = doc.new_page(width=595, height=842)
             y = 72
 
-        if len(full_part) > 60:
-            page.insert_text((50, y), full_part[:60], fontsize=9)
-            page.insert_text((50, y + 12), full_part[60:], fontsize=9)
+        desc = PART_DESCRIPTIONS[part_num]
+        page.insert_text((50, y), part_num, fontsize=10)
+
+        if len(desc) > 40:
+            page.insert_text((150, y), desc[:40], fontsize=9)
+            page.insert_text((150, y + 12), desc[40:], fontsize=9)
         else:
-            page.insert_text((50, y), full_part, fontsize=10)
+            page.insert_text((150, y), desc, fontsize=10)
 
         page.insert_text((450, y), str(count), fontsize=10)
-        y += 25 if len(full_part) > 60 else 15
+        y += 25 if len(desc) > 40 else 15
 
     total = sum(part_appearances.values())
     page.insert_text(
@@ -205,13 +215,13 @@ def create_part_numbers_summary(order_data):
     )
 
     return doc
-# ... (el resto de las funciones permanecen iguales hasta merge_documents)
+
 
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
 
-    # Insertar resumen de números de parte especiales al principio
+    # Insertar resumen al inicio
     part_summary = create_part_numbers_summary(order_meta)
     if part_summary:
         doc.insert_pdf(part_summary)
@@ -234,12 +244,12 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
 
     return doc
 
-# Streamlit UI (permanece igual)
+
+# === Interfaz de Streamlit ===
 st.title("Tequila Build/Shipment PDF Merger")
 
 build_file = st.file_uploader("Upload Build Sheets PDF", type="pdf")
 ship_file = st.file_uploader("Upload Shipment Pick Lists PDF", type="pdf")
-
 pickup_flag = st.checkbox("Summarize Customer Pickup orders", value=True)
 
 if build_file and ship_file and st.button("Generate Merged Output"):
@@ -251,19 +261,19 @@ if build_file and ship_file and st.button("Generate Merged Output"):
 
     original_pages = build_pages + ship_pages
     all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
-    # Generar mapas de build y shipment
+
     build_map = group_by_order(build_pages)
     ship_map = group_by_order(ship_pages)
 
-    # Orden de builds
     build_order = get_build_order_list(build_pages)
 
-    # Generar resumen y documento fusionado
+    # Generar resúmenes
     summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
     merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag)
 
     # Insertar resumen al inicio
-    merged.insert_pdf(summary, start_at=0)
+    if summary:
+        merged.insert_pdf(summary, start_at=0)
 
     # Botón de descarga
     st.download_button(
