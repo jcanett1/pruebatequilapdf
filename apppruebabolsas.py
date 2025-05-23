@@ -269,17 +269,31 @@ if build_file and ship_file and st.button("Generate Merged Output"):
     build_bytes = build_file.read()
     ship_bytes = ship_file.read()
 
+    # Extraer páginas de los documentos originales
     build_pages = parse_pdf(build_bytes)
     ship_pages = parse_pdf(ship_bytes)
-    combined_pages = build_pages + ship_pages
 
-    all_meta = group_by_order(combined_pages, classify_pickup=pickup_flag)
+    # Usar solo las páginas originales para crear all_meta
+    original_pages = build_pages + ship_pages
+    all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
+
+    # Crear mapas de build y shipment
     build_map = group_by_order(build_pages)
     ship_map = group_by_order(ship_pages)
 
+    # Orden de builds
     build_order = get_build_order_list(build_pages)
+
+    # Generar resumen y documento fusionado
     summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
     merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag)
-    merged.insert_pdf(summary, start_at=0)
 
-    st.download_button("Download Merged Output PDF", data=merged.tobytes(), file_name="Tequila_Merged_Output.pdf")
+    # Insertar resumen AL FINAL o AL PRINCIPIO según desees
+    merged.insert_pdf(summary)  # Al final por claridad visual
+
+    # Descargar
+    st.download_button(
+        "Download Merged Output PDF",
+        data=merged.tobytes(),
+        file_name="Tequila_Merged_Output.pdf"
+    )
