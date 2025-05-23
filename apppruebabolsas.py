@@ -17,15 +17,15 @@ def extract_identifiers(text):
     return order_id, shipment_id
 
 def extract_part_numbers(text):
-    """Extrae números de parte con coincidencia exacta y sin duplicados por página"""
-    part_counts = {}
+    """Extrae números de parte usando coincidencia exacta de descripción"""
+    part_counts = defaultdict(int)
     text_upper = text.upper()
-    
-    for part_num in PART_DESCRIPTIONS.keys():
-        # Busca coincidencias exactas (evita subcadenas)
-        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
-        if re.search(pattern, text_upper):
-            part_counts[part_num] = 1  # Contar solo 1 vez por página
+
+    for description, part_num in DESCRIPTION_TO_CODE.items():
+        pattern = r'(?<!\w)' + re.escape(description) + r'(?!\w)'
+        if re.search(pattern, text_upper, re.IGNORECASE):
+            part_counts[description] += 1  # Contar una vez por página
+
     return part_counts
 
 
@@ -57,7 +57,11 @@ PART_DESCRIPTIONS = {
     'B-PG-246-POLY': 'Minimalist Carry Stand Bag - Black',
     'B-UGB8-EP': '2020 Carry Stand Bag - Black'
 }
-    
+
+DESCRIPTION_TO_CODE = {
+    desc: code for code, desc in PART_DESCRIPTIONS.items()
+}
+
 def insert_divider_page(doc, label):
     """Crea una página divisoria con texto de etiqueta"""
     page = doc.new_page()
@@ -157,14 +161,13 @@ def group_by_order(pages, classify_pickup=False):
     return order_map
 
 def create_part_numbers_summary(order_data):
-    """Genera resumen con nombres completos y conteo de apariciones (solo los que aparecen al menos una vez)"""
+    """Genera resumen con nombres completos y conteo de apariciones (por descripción)"""
     part_appearances = defaultdict(int)
 
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
-        for part_num, count in part_numbers.items():
-            if part_num in PART_DESCRIPTIONS:
-                part_appearances[part_num] += count
+        for description, count in part_numbers.items():
+            part_appearances[description] += count
 
     if not part_appearances:
         return None
@@ -174,15 +177,14 @@ def create_part_numbers_summary(order_data):
     y = 72
 
     # Encabezado
-    headers = ["Código", "Descripción", "Apariciones"]
+    headers = ["Descripción", "Apariciones"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv", set_simple=True)
-    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv", set_simple=True)
-    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv", set_simple=True)
+    page.insert_text((450, y), headers[1], fontsize=12, fontname="helv", set_simple=True)
     y += 25
 
     # Mostrar solo partes con apariciones > 0
-    for part_num in sorted(part_appearances.keys()):
-        count = part_appearances[part_num]
+    for description in sorted(part_appearances.keys()):
+        count = part_appearances[description]
         if count == 0:
             continue
 
@@ -190,26 +192,17 @@ def create_part_numbers_summary(order_data):
             page = doc.new_page(width=595, height=842)
             y = 72
 
-        desc = PART_DESCRIPTIONS[part_num]
-
-        # Código (con color rojo si es un base sin sufijo)
-        if '-' not in part_num.split('B-PG-')[1]:
-            # Ejemplo: B-PG-172 → es base
-            page.insert_text((50, y), part_num, fontsize=10, color=(1, 0, 0))  # Rojo
-        else:
-            page.insert_text((50, y), part_num, fontsize=10)
-
         # Descripción (con salto de línea si es muy larga)
-        if len(desc) > 40:
-            page.insert_text((150, y), desc[:40], fontsize=9)
-            page.insert_text((150, y + 12), desc[40:], fontsize=9)
+        if len(description) > 40:
+            page.insert_text((50, y), description[:40], fontsize=9)
+            page.insert_text((50, y + 12), description[40:], fontsize=9)
         else:
-            page.insert_text((150, y), desc, fontsize=10)
+            page.insert_text((50, y), description, fontsize=10)
 
         # Apariciones
         page.insert_text((450, y), str(count), fontsize=10)
 
-        y += 25 if len(desc) > 40 else 15  # Ajuste de espacio
+        y += 25 if len(description) > 40 else 15
 
     # Total general
     total = sum(part_appearances.values())
