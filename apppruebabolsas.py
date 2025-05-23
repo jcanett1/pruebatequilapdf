@@ -17,45 +17,45 @@ def extract_identifiers(text):
     return order_id, shipment_id
 
 def extract_part_numbers(text):
-    part_counts = {}
+    """Extrae números de parte completos (código + descripción)"""
+    part_counts = defaultdict(int)
     text_upper = text.upper()
-    
-    for code, description in PART_PAIRS:
-        full_text = f"{code} {description}"
-        pattern = re.compile(r'\b' + re.escape(full_text) + r'\b', re.IGNORECASE)
-        if pattern.search(text_upper):
-            part_counts[code] = 1  # Contar una vez por página
-    
+
+    for full_part in FULL_PART_STRINGS:
+        pattern = r'(?<!\w)' + re.escape(full_part) + r'(?!\w)'
+        if re.search(pattern, text_upper, re.IGNORECASE):
+            part_counts[full_part] += 1  # Contar solo 1 vez por página
+
     return part_counts
 
 
 # Lista completa de números de parte a buscar
-PART_PAIRS = [
-    ('B-PG-081-BLK', '2023 PXG Deluxe Cart Bag - Black'),
-    ('B-PG-082-WHT', '2023 PXG Lightweight Cart Bag - White/Black'),
-    ('B-PG-172', '2025 Stars & Stripes LW Carry Stand Bag'),
-    ('B-PG-172-BGRY', 'Xtreme Carry Stand Bag - Black'),
-    ('B-PG-172-BLACK', 'Xtreme Carry Stand Bag - Freedom - Black'),
-    ('B-PG-172-DB', 'Deluxe Carry Stand Bag - Black'),
-    ('B-PG-172-DKNSS', 'Deluxe Carry Stand Bag - Darkness'),
-    ('B-PG-172-DW', 'Deluxe Carry Stand Bag - White'),
-    ('B-PG-172-GREEN', 'Xtreme Carry Stand Bag - Freedom - Green'),
-    ('B-PG-172-GREY', 'Xtreme Carry Stand Bag - Freedom - Grey'),
-    ('B-PG-172-NAVY', 'Xtreme Carry Stand Bag - Freedom - Navy'),
-    ('B-PG-172-TAN', 'Xtreme Carry Stand Bag - Freedom - Tan'),
-    ('B-PG-172-WBLK', 'Xtreme Carry Stand Bag - White'),
-    ('B-PG-173', '2025 Stars & Stripes Hybrid Stand Bag'),
-    ('B-PG-173-BGRY', 'Xtreme Hybrid Stand Bag - Black'),
-    ('B-PG-173-BO', 'Deluxe Hybrid Stand Bag - Black'),
-    ('B-PG-173-DKNSS', 'Deluxe Hybrid Stand Bag - Darkness'),
-    ('B-PG-173-WBLK', 'Xtreme Hybrid Stand Bag - White'),
-    ('B-PG-173-WO', 'Deluxe Hybrid Stand Bag - White'),
-    ('B-PG-244', 'Xtreme Cart Bag - White'),
-    ('B-PG-245', '2025 Stars & Stripes Cart Bag'),
-    ('B-PG-245-BLK', 'Deluxe Cart Bag B2 - Black'),
-    ('B-PG-245-WHT', 'Deluxe Cart Bag B2 - White'),
-    ('B-PG-246-POLY', 'Minimalist Carry Stand Bag - Black'),
-    ('B-UGB8-EP', '2020 Carry Stand Bag - Black')
+FULL_PART_STRINGS = [
+    "B-PG-081-BLK 2023 PXG Deluxe Cart Bag - Black",
+    "B-PG-082-WHT 2023 PXG Lightweight Cart Bag - White/Black",
+    "B-PG-172 2025 Stars & Stripes LW Carry Stand Bag",
+    "B-PG-172-BGRY Xtreme Carry Stand Bag - Black",
+    "B-PG-172-BLACK Xtreme Carry Stand Bag - Freedom - Black",
+    "B-PG-172-DB Deluxe Carry Stand Bag - Black",
+    "B-PG-172-DKNSS Deluxe Carry Stand Bag - Darkness",
+    "B-PG-172-DW Deluxe Carry Stand Bag - White",
+    "B-PG-172-GREEN Xtreme Carry Stand Bag - Freedom - Green",
+    "B-PG-172-GREY Xtreme Carry Stand Bag - Freedom - Grey",
+    "B-PG-172-NAVY Xtreme Carry Stand Bag - Freedom - Navy",
+    "B-PG-172-TAN Xtreme Carry Stand Bag - Freedom - Tan",
+    "B-PG-172-WBLK Xtreme Carry Stand Bag - White",
+    "B-PG-173 2025 Stars & Stripes Hybrid Stand Bag",
+    "B-PG-173-BGRY Xtreme Hybrid Stand Bag - Black",
+    "B-PG-173-BO Deluxe Hybrid Stand Bag - Black",
+    "B-PG-173-DKNSS Deluxe Hybrid Stand Bag - Darkness",
+    "B-PG-173-WBLK Xtreme Hybrid Stand Bag - White",
+    "B-PG-173-WO Deluxe Hybrid Stand Bag - White",
+    "B-PG-244 Xtreme Cart Bag - White",
+    "B-PG-245 2025 Stars & Stripes Cart Bag",
+    "B-PG-245-BLK Deluxe Cart Bag B2 - Black",
+    "B-PG-245-WHT Deluxe Cart Bag B2 - White",
+    "B-PG-246-POLY Minimalist Carry Stand Bag - Black",
+    "B-UGB8-EP 2020 Carry Stand Bag - Black"
 ]
 
 
@@ -163,8 +163,8 @@ def create_part_numbers_summary(order_data):
 
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
-        for part_full, count in part_numbers.items():
-            part_appearances[part_full] += count
+        for full_part, count in part_numbers.items():
+            part_appearances[full_part] += count
 
     if not part_appearances:
         return None
@@ -178,28 +178,25 @@ def create_part_numbers_summary(order_data):
     page.insert_text((450, y), headers[1], fontsize=12, fontname="helv", set_simple=True)
     y += 25
 
-    for part_full in sorted(part_appearances.keys()):
-        count = part_appearances[part_full]
+    for full_part in sorted(part_appearances.keys()):
+        count = part_appearances[full_part]
 
         if y > 750:
             page = doc.new_page(width=595, height=842)
             y = 72
 
-        # Mostrar la línea completa
-        if len(part_full) > 60:
-            page.insert_text((50, y), part_full[:60], fontsize=9)
-            page.insert_text((50, y+12), part_full[60:], fontsize=9)
+        if len(full_part) > 60:
+            page.insert_text((50, y), full_part[:60], fontsize=9)
+            page.insert_text((50, y + 12), full_part[60:], fontsize=9)
         else:
-            page.insert_text((50, y), part_full, fontsize=10)
+            page.insert_text((50, y), full_part, fontsize=10)
 
-        # Apariciones
         page.insert_text((450, y), str(count), fontsize=10)
-
-        y += 25 if len(part_full) > 60 else 15
+        y += 25 if len(full_part) > 60 else 15
 
     total = sum(part_appearances.values())
     page.insert_text(
-        (50, y+20),
+        (50, y + 20),
         f"TOTAL GENERAL DE APARICIONES: {total}",
         fontsize=14,
         color=(0, 0, 1),
