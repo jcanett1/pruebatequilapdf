@@ -20,26 +20,47 @@ def extract_identifiers(text):
     return order_id, shipment_id
 
 def extract_part_numbers(text):
-    """Extrae los números de parte y cuenta apariciones (no cantidades)"""
+    """Extrae números de parte con búsqueda exacta y sensible al contexto"""
     part_counts = {}
     text_upper = text.upper()
     
-    # Busca todos los números de parte en el texto
-    for part_num in TARGET_PARTS:
-        count = len(re.findall(r'\b' + re.escape(part_num) + r'\b', text_upper))  # Paréntesis cerrado
+    for part_num in PART_DESCRIPTIONS.keys():
+        # Búsqueda exacta considerando posibles espacios o guiones adicionales
+        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
+        count = len(re.findall(pattern, text_upper, re.IGNORECASE))
         if count > 0:
             part_counts[part_num] = part_counts.get(part_num, 0) + count
     
     return part_counts
 
+
 # Lista completa de números de parte a buscar
 TARGET_PARTS = [
-    'B-PG-081-BLK', 'B-PG-082-WHT', 'B-PG-172', 'B-PG-172-BGRY',
-    'B-PG-172-BLACK', 'B-PG-172-DB', 'B-PG-172-DKNSS', 'B-PG-172-DW',
-    'B-PG-172-GREEN', 'B-PG-172-GREY', 'B-PG-172-NAVY', 'B-PG-172-TAN',
-    'B-PG-172-WBLK', 'B-PG-173', 'B-PG-173-BGRY', 'B-PG-173-BO',
-    'B-PG-173-DKNSS', 'B-PG-173-WBLK', 'B-PG-173-WO', 'B-PG-244',
-    'B-PG-245', 'B-PG-245-BLK', 'B-PG-245-WHT', 'B-PG-246-POLY', 'B-UGB8-EP'
+    'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
+    'B-PG-082-WHT': '2023 PXG Lightweight Cart Bag - White/Black',
+    'B-PG-172': '2025 Stars & Stripes LW Carry Stand Bag',
+    'B-PG-172-BGRY': 'Xtreme Carry Stand Bag - Black',
+    'B-PG-172-BLACK': 'Xtreme Carry Stand Bag - Freedom - Black',
+    'B-PG-172-DB': 'Deluxe Carry Stand Bag - Black',
+    'B-PG-172-DKNSS': 'Deluxe Carry Stand Bag - Darkness',
+    'B-PG-172-DW': 'Deluxe Carry Stand Bag - White',
+    'B-PG-172-GREEN': 'Xtreme Carry Stand Bag - Freedom - Green',
+    'B-PG-172-GREY': 'Xtreme Carry Stand Bag - Freedom - Grey',
+    'B-PG-172-NAVY': 'Xtreme Carry Stand Bag - Freedom - Navy',
+    'B-PG-172-TAN': 'Xtreme Carry Stand Bag - Freedom - Tan',
+    'B-PG-172-WBLK': 'Xtreme Carry Stand Bag - White',
+    'B-PG-173': '2025 Stars & Stripes Hybrid Stand Bag',
+    'B-PG-173-BGRY': 'Xtreme Hybrid Stand Bag - Black',
+    'B-PG-173-BO': 'Deluxe Hybrid Stand Bag - Black',
+    'B-PG-173-DKNSS': 'Deluxe Hybrid Stand Bag - Darkness',
+    'B-PG-173-WBLK': 'Xtreme Hybrid Stand Bag - White',
+    'B-PG-173-WO': 'Deluxe Hybrid Stand Bag - White',
+    'B-PG-244': 'Xtreme Cart Bag - White',
+    'B-PG-245': '2025 Stars & Stripes Cart Bag',
+    'B-PG-245-BLK': 'Deluxe Cart Bag B2 - Black',
+    'B-PG-245-WHT': 'Deluxe Cart Bag B2 - White',
+    'B-PG-246-POLY': 'Minimalist Carry Stand Bag - Black',
+    'B-UGB8-EP': '2020 Carry Stand Bag- Black'
 ]
     
 def insert_divider_page(doc, label):
@@ -141,13 +162,13 @@ def group_by_order(pages, classify_pickup=False):
     return order_map
 
 def create_part_numbers_summary(order_data):
-    """Crea resumen contando apariciones (no sumando cantidades)"""
-    part_appearances = defaultdict(int)  # {part_number: conteo_apariciones}
-    associated_shipments = defaultdict(set)  # {part_number: set(shipment_ids)}
+    """Genera resumen con nombres completos y conteo de apariciones"""
+    part_appearances = defaultdict(int)
+    associated_shipments = defaultdict(set)
     
     for oid, data in order_data.items():
         for part_num, count in data.get("part_numbers", {}).items():
-            if part_num in TARGET_PARTS:
+            if part_num in PART_DESCRIPTIONS:
                 part_appearances[part_num] += count
                 if data.get("shipment_id"):
                     associated_shipments[part_num].add(data["shipment_id"])
@@ -159,38 +180,51 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
     
-    # Encabezado
-    page.insert_text((72, y), "RESUMEN DE APARICIONES DE BOLSAS", fontsize=16)
-    y += 30
-    page.insert_text((72, y), "Número de Parte", fontsize=12)
-    page.insert_text((250, y), "Veces que aparece", fontsize=12)
-    page.insert_text((400, y), "Envíos asociados", fontsize=12)
-    y += 20
+    # Encabezado mejorado
+    headers = ["Código", "Descripción", "Apariciones", "Envíos"]
+    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv-bold")
+    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv-bold")
+    page.insert_text((400, y), headers[2], fontsize=12, fontname="helv-bold")
+    page.insert_text((480, y), headers[3], fontsize=12, fontname="helv-bold")
+    y += 25
     
-    # Datos
+    # Datos con descripciones completas
     for part_num in sorted(part_appearances.keys()):
-        if y > 770:
+        if y > 750:  # Nueva página antes de llegar al final
             page = doc.new_page(width=595, height=842)
             y = 72
             
-        page.insert_text((72, y), part_num, fontsize=10)
-        page.insert_text((250, y), str(part_appearances[part_num]), fontsize=10)
+        # Código
+        page.insert_text((50, y), part_num, fontsize=10)
         
+        # Descripción completa (con salto de línea si es muy larga)
+        desc = PART_DESCRIPTIONS[part_num]
+        if len(desc) > 40:  # Ajusta según necesidad
+            page.insert_text((150, y), desc[:40], fontsize=9)
+            page.insert_text((150, y+12), desc[40:], fontsize=9)
+        else:
+            page.insert_text((150, y), desc, fontsize=10)
+        
+        # Conteo
+        page.insert_text((400, y), str(part_appearances[part_num]), fontsize=10)
+        
+        # Envíos asociados
         shipments = sorted(associated_shipments.get(part_num, []))[:3]
-        shipments_text = ", ".join(shipments)
+        shipments_text = ", ".join(shipments) if shipments else "N/A"
         if len(associated_shipments.get(part_num, [])) > 3:
-            shipments_text += f"... (+{len(associated_shipments[part_num])-3} más)"
-        page.insert_text((400, y), shipments_text, fontsize=10)
+            shipments_text += f"..."
+        page.insert_text((480, y), shipments_text, fontsize=9)
         
-        y += 15
+        y += 25 if len(desc) > 40 else 15  # Ajuste de espacio
     
-    # Total general (suma de todas las apariciones)
-    total_apariciones = sum(part_appearances.values())
+    # Total general
+    total = sum(part_appearances.values())
     page.insert_text(
-        (72, y + 20),
-        f"TOTAL DE APARICIONES: {total_apariciones}",
+        (50, y+20),
+        f"TOTAL GENERAL DE APARICIONES: {total}",
         fontsize=14,
-        color=(1, 0, 0)
+        color=(0, 0, 1),  # Azul para destacar
+        fontname="helv-bold"
     )
     
     return doc
