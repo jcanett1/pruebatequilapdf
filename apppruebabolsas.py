@@ -192,8 +192,12 @@ def create_part_numbers_summary(order_data):
 
         desc = PART_DESCRIPTIONS[part_num]
 
-        # Código
-        page.insert_text((50, y), part_num, fontsize=10)
+        # Código (con color rojo si es un base sin sufijo)
+        if '-' not in part_num.split('B-PG-')[1]:
+            # Ejemplo: B-PG-172 → es base
+            page.insert_text((50, y), part_num, fontsize=10, color=(1, 0, 0))  # Rojo
+        else:
+            page.insert_text((50, y), part_num, fontsize=10)
 
         # Descripción (con salto de línea si es muy larga)
         if len(desc) > 40:
