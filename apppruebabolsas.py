@@ -26,7 +26,7 @@ def extract_part_numbers(text):
     
     # Busca todos los números de parte en el texto
     for part_num in TARGET_PARTS:
-        count = len(re.findall(r'\b' + re.escape(part_num) + r'\b', text_upper)
+        count = len(re.findall(r'\b' + re.escape(part_num) + r'\b', text_upper))  # Paréntesis cerrado
         if count > 0:
             part_counts[part_num] = part_counts.get(part_num, 0) + count
     
