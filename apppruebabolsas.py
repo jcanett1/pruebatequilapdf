@@ -73,7 +73,6 @@ def insert_divider_page(doc, label):
 
 
 def parse_pdf(file_bytes):
-    """Parsea un archivo PDF y devuelve sus páginas con metadatos"""
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     pages = []
     last_order_id = None
@@ -97,7 +96,7 @@ def parse_pdf(file_bytes):
 
         pages.append({
             "number": i,
-            "text": text,
+            "text": text,  # 👈 Muy importante: guardamos el texto
             "order_id": order_id,
             "shipment_id": shipment_id,
             "part_numbers": part_numbers,
@@ -106,7 +105,6 @@ def parse_pdf(file_bytes):
         })
 
     return pages
-
 
 def create_summary_page(order_data, build_keys, shipment_keys, pickup_flag):
     all_orders = set(build_keys) | set(shipment_keys)
@@ -151,13 +149,15 @@ def get_build_order_list(build_pages):
 def group_by_order(pages, classify_pickup=False):
     order_map = defaultdict(lambda: {"pages": [], "pickup": False, "part_numbers": defaultdict(int)})
     for page in pages:
-        oid = page["order_id"]
+        oid = page.get("order_id")  # Usa .get() para evitar KeyError
         if not oid:
             continue
         order_map[oid]["pages"].append(page)
-        if classify_pickup and PICKUP_REGEX.search(page["text"]):
-            order_map[oid]["pickup"] = True
-        for part_num, qty in page["part_numbers"].items():
+        if classify_pickup:
+            text = page.get("text", "")
+            if PICKUP_REGEX.search(text):
+                order_map[oid]["pickup"] = True
+        for part_num, qty in page.get("part_numbers", {}).items():
             order_map[oid]["part_numbers"][part_num] += qty
     return order_map
 
