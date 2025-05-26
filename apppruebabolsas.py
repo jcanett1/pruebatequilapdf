@@ -171,7 +171,9 @@ def create_part_numbers_summary(order_data):
         part_numbers = data.get("part_numbers", {})
         for part_num, count in part_numbers.items():
             if part_num in PART_DESCRIPTIONS:
-                part_appearances[part_num] += count
+                # Usamos el código + descripción como clave única
+                full_key = f"{part_num} - {PART_DESCRIPTIONS[part_num]}"
+                part_appearances[full_key] += count  # Sumamos apariciones por clave completa
 
     if not part_appearances:
         return None
@@ -180,43 +182,35 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    # Encabezados
-    headers = ["Código", "Descripción", "Apariciones"]
+    headers = ["Código + Descripción", "Apariciones"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
-    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
-
-    # Alineamos "Apariciones" a la derecha de forma manual
-    avg_char_width = 6  # ajuste según tamaño de fuente
-    header3_width = len(headers[2]) * avg_char_width
-    x_header3 = 540 - header3_width
-    page.insert_text((x_header3, y), headers[2], fontsize=12, fontname="helv")
-
+    page.insert_text((500, y), headers[1], fontsize=12, fontname="helv", align=3)
     y += 25
 
-    for part_num in sorted(part_appearances.keys()):
-        count = part_appearances[part_num]
+    avg_char_width = 6  # Aproximación para alinear números
+
+    for full_key in sorted(part_appearances.keys()):
+        count = part_appearances[full_key]
         if count == 0:
             continue
         if y > 750:
             page = doc.new_page(width=595, height=842)
             y = 72
 
-        desc = PART_DESCRIPTIONS[part_num]
-
-        # Mostrar código + descripción
-        full_line = f"{part_num} - {desc}"
+        # Dividir en líneas si es muy larga
         lines = []
-        while len(full_line) > 60:
-            chunk = full_line[:60]
+        while len(full_key) > 60:
+            chunk = full_key[:60]
             lines.append(chunk)
-            full_line = full_line[60:]
-        lines.append(full_line)
+            full_key = full_key[60:]
+        lines.append(full_key)
 
+        # Insertar texto línea por línea
         for line in lines:
             page.insert_text((50, y), line, fontsize=10)
             y += 12
 
-        # Insertar cantidad al final (alineado a la derecha)
+        # Retroceder una línea para insertar número
         y -= 12
         count_str = str(count)
         text_width = len(count_str) * avg_char_width
