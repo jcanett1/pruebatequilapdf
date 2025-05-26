@@ -19,7 +19,7 @@ def extract_identifiers(text):
 
 
 def extract_part_numbers(text):
-    """Extrae números de parte buscando primero por DESCRIPCIÓN completa"""
+    """Extrae números de parte buscando coincidencias exactas de códigos completos"""
     part_sh_numbers = defaultdict(list)
 
     text_upper = text.upper()
@@ -30,17 +30,18 @@ def extract_part_numbers(text):
     if not sh_list:
         sh_list = ["Unknown"]
 
-    # Buscar por descripción completa
-    for description, part_num in DESCRIPTION_TO_CODE.items():
-        escaped = re.escape(description)
+    # Primero buscar por códigos exactos
+    for part_num in PART_DESCRIPTIONS.keys():
+        # Usamos \b para coincidencia de palabra completa y escapamos el código
+        escaped = re.escape(part_num)
         if re.search(rf'\b{escaped}\b', text_upper):
             for sh in sh_list:
                 part_sh_numbers[part_num].append(sh)
 
-    # Si no se encontró nada, usar búsqueda por código como respaldo
+    # Si no se encontró nada, intentar con descripciones como respaldo
     if not part_sh_numbers:
-        for part_num in PART_DESCRIPTIONS.keys():
-            escaped = re.escape(part_num)
+        for description, part_num in DESCRIPTION_TO_CODE.items():
+            escaped = re.escape(description)
             if re.search(rf'\b{escaped}\b', text_upper):
                 for sh in sh_list:
                     part_sh_numbers[part_num].append(sh)
