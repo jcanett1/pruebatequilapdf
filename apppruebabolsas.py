@@ -184,7 +184,13 @@ def create_part_numbers_summary(order_data):
     headers = ["Código", "Descripción", "Apariciones"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
     page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
-    page.insert_text((480, y), headers[2], fontsize=12, fontname="helv", align="right")
+
+    # Alineamos "Apariciones" a la derecha de forma manual
+    total_width = 540
+    header3_width = fitz.getTextLength(headers[2], fontsize=12, fontname="helv")
+    x_header3 = total_width - header3_width
+    page.insert_text((x_header3, y), headers[2], fontsize=12, fontname="helv")
+
     y += 25
 
     for part_num in sorted(part_appearances.keys()):
@@ -197,7 +203,7 @@ def create_part_numbers_summary(order_data):
 
         desc = PART_DESCRIPTIONS[part_num]
 
-        # Mostrar código + descripción completa en una sola línea
+        # Mostrar código + descripción
         full_line = f"{part_num} - {desc}"
         lines = []
         while len(full_line) > 60:
@@ -206,7 +212,6 @@ def create_part_numbers_summary(order_data):
             full_line = full_line[60:]
         lines.append(full_line)
 
-        # Insertar línea(s) de texto
         for line in lines:
             page.insert_text((50, y), line, fontsize=10)
             y += 12
@@ -214,8 +219,8 @@ def create_part_numbers_summary(order_data):
         # Insertar cantidad al final (alineado a la derecha)
         y -= 12
         count_str = str(count)
-        count_width = fitz.getTextLength(count_str, fontsize=10, fontname="helv")
-        x_count = 540 - count_width
+        text_width = fitz.getTextLength(count_str, fontsize=10, fontname="helv")
+        x_count = 540 - text_width
         page.insert_text((x_count, y), count_str, fontsize=10)
         y += 12
 
@@ -224,6 +229,7 @@ def create_part_numbers_summary(order_data):
     if y > 750:
         page = doc.new_page(width=595, height=842)
         y = 72
+
     page.insert_text(
         (50, y),
         f"TOTAL GENERAL DE APARICIONES: {total}",
