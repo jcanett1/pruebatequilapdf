@@ -196,9 +196,10 @@ def create_part_numbers_summary(order_data):
         full_line = f"{part_num} - {desc}"
         count_str = str(count)
 
-        # Calcular anchura del texto usando fitz.getTextLength
-        count_width = fitz.getTextLength(count_str, fontsize=10, fontname="helv")
-        x_count = 540 - count_width  # Alineamos a la derecha
+        # Aproximación simple para alinear a la derecha
+        avg_char_width = 5.5  # Ancho promedio en puntos (ajustable)
+        text_width = len(count_str) * avg_char_width
+        x_count = 540 - text_width  # Alineado a la derecha
 
         # Insertar línea completa
         page.insert_text((50, y), full_line, fontsize=10, fontname="helv")
