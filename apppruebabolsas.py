@@ -183,81 +183,77 @@ def group_by_order(pages, classify_pickup=False):
     return order_map
 
 def create_part_numbers_summary(order_data):
-    part_sh_numbers = defaultdict(list)
+    part_appearances = defaultdict(int)
 
-    # Recolección de todos los SH asociados a cada código
+    # Contar apariciones por código
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
-        for part_num, sh_list in part_numbers.items():
+        for part_num, count in part_numbers.items():
             if part_num in PART_DESCRIPTIONS:
-                part_sh_numbers[part_num].extend(sh_list)
+                part_appearances[part_num] += count
 
-    if not part_sh_numbers:
+    if not part_appearances:
         return None
 
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    # Encabezado principal
-    page.insert_text((50, y), "CÓDIGOS Y SUS ÓRDENES DE APARICIÓN", fontsize=14, fontname="helv", color=(0, 0, 1))
-    y += 20
+    # Encabezado del resumen
+    page.insert_text((50, y), "CÓDIGOS Y SUS ÓRDENES DE APARICIÓN", fontsize=14, fontname="helb", color=(0, 0, 0))
+    y += 25
 
     avg_char_width = 5.5  # Aproximación del ancho promedio de caracteres
 
-    for part_num in sorted(part_sh_numbers.keys()):
-        sh_list = part_sh_numbers[part_num]
-        unique_sh = list(set(sh_list))  # Eliminar duplicados
-        if not unique_sh:
+    for part_num in sorted(part_appearances.keys()):
+        count = part_appearances[part_num]
+        if count == 0:
             continue
         if y > 750:
             page = doc.new_page(width=595, height=842)
             y = 72
 
         desc = PART_DESCRIPTIONS[part_num]
-        full_line = f"{part_num} - {desc}"
+        full_title = f"{desc} - {part_num}"
 
-        # Mostrar línea del código + descripción
+        # Mostrar título: descripción + código en negrita y más grande
+        page.insert_text((50, y), full_title, fontsize=12, fontname="helb")
+        y += 18  # Espacio después del título
+
+        # Mostrar lista de SH
+        sh_list = order_data.get(part_num, {}).get("sh_list", [])
+        if sh_list:
+            sh_str = ", ".join(set(sh_list))  # Elimina duplicados
+        else:
+            sh_str = "No se encontraron órdenes (SH)"
+
+        # Insertar línea de SH
         lines = []
-        temp = full_line
-        while len(temp) > 60:
-            chunk = temp[:60]
+        temp = sh_str
+        while len(temp) > 70:
+            chunk = temp[:70]
             lines.append(chunk)
-            temp = temp[60:]
+            temp = temp[70:]
         lines.append(temp)
 
         for line in lines:
-            page.insert_text((50, y), line, fontsize=10)
-            y += 12
-
-        # Agregar espacio antes del cuadro
-        y += 5
-
-        # Crear cuadro con las órdenes (SHXXXXX)
-        sh_str = ", ".join(unique_sh)
-        rect_height = ((len(sh_str) // 60) + 1) * 14 + 10
-        rect = fitz.Rect(50, y, 540, y + rect_height)
-        page.draw_rect(rect, color=(0, 0, 0), width=0.5)
-        y += 5
-
-        # Insertar texto del SH dentro del cuadro
-        char_per_line = 60
-        chunks = [sh_str[i:i+char_per_line] for i in range(0, len(sh_str), char_per_line)]
-        for chunk in chunks:
-            page.insert_text((60, y), chunk, fontsize=10)
+            if y > 750:
+                page = doc.new_page(width=595, height=842)
+                y = 72
+            page.insert_text((60, y), line, fontsize=10, fontname="helv")
             y += 14
 
-        y += 10  # Espacio después del cuadro
+        y += 10  # Espacio entre bloques
 
-    total = len(part_sh_numbers)
-    y += 20
+    total = sum(part_appearances.values())
+    y += 10
     if y > 750:
         page = doc.new_page(width=595, height=842)
         y = 72
 
     page.insert_text(
         (50, y),
-        f"TOTAL DE CÓDIGOS ÚNICOS ENCONTRADOS: {total}",
+        f"TOTAL GENERAL DE APARICIONES: {total}",
         fontsize=14,
         color=(0, 0, 1),
         fontname="helv"
