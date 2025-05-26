@@ -20,15 +20,18 @@ def extract_identifiers(text):
 
 def extract_part_numbers(text):
     """Extrae números de parte con coincidencia EXACTA del código + descripción"""
-    part_counts = {}
+    part_sh_numbers = defaultdict(list)
     text_upper = text.upper()
 
     for full_key in PART_DESCRIPTIONS.keys():
         escaped = re.escape(full_key)
         if re.search(rf'\b{escaped}\b', text_upper):
-            part_counts[full_key] = 1  # Contar solo una vez por página
+            # Aquí debes extraer el número de SH del texto
+            # Asumiendo que el texto contiene el número de SH en algún formato
+            sh_number = re.search(r'SH\d+', text)
+            if sh_number:
+                part_sh_numbers[full_key].append(sh_number.group())
 
-    return part_counts
 
 # === Definición correcta de partes (diccionario) ===
 PART_DESCRIPTIONS = {
@@ -167,16 +170,16 @@ from collections import defaultdict
 import fitz  # Asegúrate de tener esta importación si no está arriba
 
 def create_part_numbers_summary(order_data):
-    part_appearances = defaultdict(int)
+    part_sh_numbers = defaultdict(list)
 
-    # Contar cuántas veces aparece cada código
+    # Asociar cada código de parte con una lista de números de SH
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
-        for part_num, count in part_numbers.items():
+        for part_num, sh_list in part_numbers.items():
             if part_num in PART_DESCRIPTIONS:
-                part_appearances[part_num] += count
+                part_sh_numbers[part_num].extend(sh_list)
 
-    if not part_appearances:
+    if not part_sh_numbers:
         return None
 
     doc = fitz.open()
@@ -184,17 +187,17 @@ def create_part_numbers_summary(order_data):
     y = 72
 
     # Encabezados
-    headers = ["Código + Descripción", "Apariciones"]
+    headers = ["Código + Descripción", "Números de SH"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
     page.insert_text((500, y), headers[1], fontsize=12, fontname="helv")
     y += 25
 
     avg_char_width = 6  # Aproximación del ancho promedio de caracteres
 
-    # Mostrar cada código + descripción
-    for part_num in sorted(part_appearances.keys()):
-        count = part_appearances[part_num]
-        if count == 0:
+    # Mostrar cada código + descripción y sus números de SH
+    for part_num in sorted(part_sh_numbers.keys()):
+        sh_list = part_sh_numbers[part_num]
+        if not sh_list:
             continue
         if y > 750:
             page = doc.new_page(width=595, height=842)
@@ -216,28 +219,13 @@ def create_part_numbers_summary(order_data):
             page.insert_text((50, y), line, fontsize=10)
             y += 12
 
-        # Retroceder una línea para insertar cantidad
+        # Retroceder una línea para insertar números de SH
         y -= 12
-        count_str = str(count)
-        text_width = len(count_str) * avg_char_width
-        x_count = 540 - text_width  # Alineado a la derecha
-        page.insert_text((x_count, y), count_str, fontsize=10)
+        sh_str = ", ".join(sh_list)
+        text_width = len(sh_str) * avg_char_width
+        x_sh = 540 - text_width  # Alineado a la derecha
+        page.insert_text((x_sh, y), sh_str, fontsize=10)
         y += 12
-
-    # Total general
-    total = sum(part_appearances.values())
-    y += 20
-    if y > 750:
-        page = doc.new_page(width=595, height=842)
-        y = 72
-
-    page.insert_text(
-        (50, y),
-        f"TOTAL GENERAL DE APARICIONES: {total}",
-        fontsize=14,
-        color=(0, 0, 1),
-        fontname="helv"
-    )
 
     return doc
 
