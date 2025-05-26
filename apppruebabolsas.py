@@ -75,6 +75,9 @@ PART_DESCRIPTIONS = {
     "2020 Carry Stand Bag - Black": "B-UGB8-EP"
 }
 
+DESCRIPTION_TO_CODE = {
+    description: code for code, description in PART_DESCRIPTIONS.items()
+}
 
 def insert_divider_page(doc, label):
     """Crea una página divisoria con texto de etiqueta"""
