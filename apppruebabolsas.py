@@ -199,16 +199,15 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    headers = ["Código + Descripción", "Números de SH"]
-    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
-    page.insert_text((450, y), headers[1], fontsize=12, fontname="helv")
-    y += 25
+    # Encabezado principal
+    page.insert_text((50, y), "CÓDIGOS Y SUS ÓRDENES DE APARICIÓN", fontsize=14, fontname="helv", color=(0, 0, 1))
+    y += 20
 
     avg_char_width = 5.5  # Aproximación del ancho promedio de caracteres
 
     for part_num in sorted(part_sh_numbers.keys()):
         sh_list = part_sh_numbers[part_num]
-        unique_sh = list(set(sh_list))
+        unique_sh = list(set(sh_list))  # Eliminar duplicados
         if not unique_sh:
             continue
         if y > 750:
@@ -218,6 +217,7 @@ def create_part_numbers_summary(order_data):
         desc = PART_DESCRIPTIONS[part_num]
         full_line = f"{part_num} - {desc}"
 
+        # Mostrar línea del código + descripción
         lines = []
         temp = full_line
         while len(temp) > 60:
@@ -230,12 +230,24 @@ def create_part_numbers_summary(order_data):
             page.insert_text((50, y), line, fontsize=10)
             y += 12
 
-        y -= 12  # Retrocedemos una línea para insertar los SH a la derecha
+        # Agregar espacio antes del cuadro
+        y += 5
+
+        # Crear cuadro con las órdenes (SHXXXXX)
         sh_str = ", ".join(unique_sh)
-        text_width = len(sh_str) * avg_char_width
-        x_sh = 540 - text_width
-        page.insert_text((x_sh, y), sh_str, fontsize=10)
-        y += 12
+        rect_height = ((len(sh_str) // 60) + 1) * 14 + 10
+        rect = fitz.Rect(50, y, 540, y + rect_height)
+        page.draw_rect(rect, color=(0, 0, 0), width=0.5)
+        y += 5
+
+        # Insertar texto del SH dentro del cuadro
+        char_per_line = 60
+        chunks = [sh_str[i:i+char_per_line] for i in range(0, len(sh_str), char_per_line)]
+        for chunk in chunks:
+            page.insert_text((60, y), chunk, fontsize=10)
+            y += 14
+
+        y += 10  # Espacio después del cuadro
 
     total = len(part_sh_numbers)
     y += 20
