@@ -17,19 +17,34 @@ def extract_identifiers(text):
     order_match = ORDER_REGEX.search(text)
     shipment_match = SHIPMENT_REGEX.search(text)
     order_id = f"{order_match.group(1).rstrip('-')}-{order_match.group(2)}" if order_match else None
-    shipment_id = f"SH{shipment_match.group(1)}" if shipment_match else None
+    shipment_id = shipment_match.group(1) if shipment_match else None
     return order_id, shipment_id
 
-
 def extract_part_numbers(text):
-    """Extrae números de parte con coincidencia exacta y sin duplicados por página"""
+    """Extrae números de parte con coincidencia exacta"""
     part_counts = {}
     text_upper = text.upper()
     for part_num in PART_DESCRIPTIONS.keys():
         pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
         if re.search(pattern, text_upper):
-            part_counts[part_num] = 1  # Contar solo 1 vez por página
+            part_counts[part_num] = 1
     return part_counts
+
+def extract_relations(text, order_id, shipment_id):
+    """Extrae relaciones entre códigos, órdenes y SH"""
+    relations = []
+    text_upper = text.upper()
+    
+    for part_num in PART_DESCRIPTIONS:
+        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
+        if re.search(pattern, text_upper) and order_id and shipment_id:
+            relations.append({
+                "Orden": order_id,
+                "Código": part_num,
+                "Descripción": PART_DESCRIPTIONS[part_num],
+                "SH": shipment_id
+            })
+    return relations
 
 
 # === Definición correcta de partes (diccionario) ===
@@ -280,12 +295,6 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, r
         doc.insert_pdf(part_summary)
         insert_divider_page(doc, "Documentos Principales")
 
-    # Insertar resumen al inicio
-    part_summary = create_part_numbers_summary(order_meta)
-    if part_summary:
-        doc.insert_pdf(part_summary)
-        insert_divider_page(doc, "Main Documents")
-
     if pickup_flag and pickups:
         insert_divider_page(doc, "Customer Pickup Orders")
         for oid in pickups:
@@ -303,9 +312,8 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, r
 
     return doc
 
-
 # === Interfaz de Streamlit ===
-st.title("Tequila Build/Shipment PDF Merger")
+st.title("Tequila Build/Shipment PDF Processor")
 
 build_file = st.file_uploader("Upload Build Sheets PDF", type="pdf")
 ship_file = st.file_uploader("Upload Shipment Pick Lists PDF", type="pdf")
@@ -322,13 +330,13 @@ if build_file and ship_file:
     # Combinar todo
     original_pages = build_pages + ship_pages
     all_relations = build_relations + ship_relations
-    all_two_day = build_two_day.union(ship_two_day)  # Combinar los sets
+    all_two_day = build_two_day.union(ship_two_day)
     all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
 
     # Mostrar tabla interactiva
     display_interactive_table(all_relations)
 
-    # Mostrar SH con método 2 day en la interfaz
+    # Mostrar SH con método 2 day
     if all_two_day:
         st.subheader("Órdenes con Shipping Method: 2 day")
         st.write(", ".join(sorted(all_two_day)))
