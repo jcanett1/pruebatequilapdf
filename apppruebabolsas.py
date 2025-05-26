@@ -19,15 +19,14 @@ def extract_identifiers(text):
 
 
 def extract_part_numbers(text):
-    """Extrae números de parte con coincidencia EXACTA y sin duplicados por página"""
+    """Extrae números de parte con coincidencia EXACTA del código + descripción completa"""
     part_counts = {}
-    text = text.upper()  # Hacer búsqueda case-insensitive
+    text_clean = text.upper()
 
-    for part_num in PART_DESCRIPTIONS.keys():
-        escaped = re.escape(part_num)
-        # Buscar el número completo rodeado de límites de palabra o espacios
-        if re.search(rf'\b{escaped}\b', text):
-            part_counts[part_num] = 1  # Contar solo una vez por página
+    for part_num, description in PART_DESCRIPTIONS.items():
+        full_key = f"{part_num} - {description}".upper()
+        if full_key in text_clean:
+            part_counts[full_key] = 1  # Contar solo una vez por página
 
     return part_counts
 
@@ -169,11 +168,8 @@ def create_part_numbers_summary(order_data):
     part_appearances = defaultdict(int)
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
-        for part_num, count in part_numbers.items():
-            if part_num in PART_DESCRIPTIONS:
-                # Usamos el código + descripción como clave única
-                full_key = f"{part_num} - {PART_DESCRIPTIONS[part_num]}"
-                part_appearances[full_key] += count  # Sumamos apariciones por clave completa
+        for full_key, count in part_numbers.items():
+            part_appearances[full_key] += count
 
     if not part_appearances:
         return None
@@ -184,7 +180,7 @@ def create_part_numbers_summary(order_data):
 
     headers = ["Código + Descripción", "Apariciones"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
-    page.insert_text((500, y), headers[1], fontsize=12, fontname="helv", align=3)
+    page.insert_text((500, y), headers[1], fontsize=12, fontname="helv")
     y += 25
 
     avg_char_width = 6  # Aproximación para alinear números
@@ -197,7 +193,6 @@ def create_part_numbers_summary(order_data):
             page = doc.new_page(width=595, height=842)
             y = 72
 
-        # Dividir en líneas si es muy larga
         lines = []
         while len(full_key) > 60:
             chunk = full_key[:60]
@@ -205,12 +200,10 @@ def create_part_numbers_summary(order_data):
             full_key = full_key[60:]
         lines.append(full_key)
 
-        # Insertar texto línea por línea
         for line in lines:
             page.insert_text((50, y), line, fontsize=10)
             y += 12
 
-        # Retroceder una línea para insertar número
         y -= 12
         count_str = str(count)
         text_width = len(count_str) * avg_char_width
