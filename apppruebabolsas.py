@@ -202,8 +202,13 @@ def create_part_numbers_summary(order_data):
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
         for part_num, sh_list in part_numbers.items():
-            if part_num in PART_DESCRIPTIONS:
-                part_sh_numbers[part_num].extend(sh_list)
+            # Asegurarnos que el código está normalizado
+            normalized_num = normalize_code(part_num)
+            if normalized_num in PART_DESCRIPTIONS:
+                # Agregar solo si no está ya en la lista
+                for sh in sh_list:
+                    if sh not in part_sh_numbers[normalized_num]:
+                        part_sh_numbers[normalized_num].append(sh)
 
     if not part_sh_numbers:
         return None
@@ -212,70 +217,36 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    # Encabezado principal
-    page.insert_text((50, y), "CÓDIGOS Y SUS ÓRDENES DE APARICIÓN", fontsize=14, fontname="helv", color=(0, 0, 1))
-    y += 20
+    # Encabezado
+    page.insert_text((50, y), "INFORME DE CÓDIGOS Y SH ASOCIADOS", fontsize=14, color=(0, 0, 1))
+    y += 25
 
-    avg_char_width = 5.5  # Aproximación del ancho promedio de caracteres
+    # Ordenar los códigos alfabéticamente
+    sorted_codes = sorted(part_sh_numbers.keys(), key=lambda x: [
+        int(part) if part.isdigit() else part 
+        for part in re.split('([0-9]+)', x)
+    ])
 
-    for part_num in sorted(part_sh_numbers.keys()):
+    for part_num in sorted_codes:
         sh_list = part_sh_numbers[part_num]
-        unique_sh = list(set(sh_list))  # Eliminar duplicados
-        if not unique_sh:
-            continue
-        if y > 750:
+        desc = PART_DESCRIPTIONS.get(part_num, "Descripción no encontrada")
+        
+        if y > 750:  # Si nos quedamos sin espacio
             page = doc.new_page(width=595, height=842)
             y = 72
 
-        desc = PART_DESCRIPTIONS[part_num]
-        full_line = f"{part_num} - {desc}"
+        # Mostrar código y descripción
+        page.insert_text((50, y), f"{part_num} - {desc}", fontsize=12, fontname="helv")
+        y += 15
 
-        lines = []
-        temp = full_line
-        while len(temp) > 60:
-            chunk = temp[:60]
-            lines.append(chunk)
-            temp = temp[60:]
-        lines.append(temp)
+        # Mostrar SH asociados
+        sh_text = ", ".join(sorted(sh_list))
+        page.insert_text((60, y), f"SH: {sh_text}", fontsize=10)
+        y += 20  # Espacio adicional entre items
 
-        # Mostrar línea del código + descripción en negrita simulada (más grande)
-        for line in lines:
-            page.insert_text((50, y), line, fontsize=12, fontname="helv")
-            y += 14
-
-        # Agregar espacio antes del cuadro
-        y += 5
-
-        # Crear cuadro con las órdenes (SHXXXXX)
-        sh_str = ", ".join(unique_sh)
-        rect_height = ((len(sh_str) // 60) + 1) * 14 + 10
-        rect = fitz.Rect(50, y, 540, y + rect_height)
-        page.draw_rect(rect, color=(0, 0, 0), width=0.5)
-        y += 5
-
-        # Insertar texto del SH dentro del cuadro
-        char_per_line = 60
-        chunks = [sh_str[i:i+char_per_line] for i in range(0, len(sh_str), char_per_line)]
-        for chunk in chunks:
-            page.insert_text((60, y), chunk, fontsize=10, fontname="helv")
-            y += 14
-
-        y += 10  # Espacio después del cuadro
-
-    total = len(part_sh_numbers)
-    y += 20
-    if y > 750:
-        page = doc.new_page(width=595, height=842)
-        y = 72
-
-    page.insert_text(
-        (50, y),
-        f"TOTAL DE CÓDIGOS ÚNICOS ENCONTRADOS: {total}",
-        fontsize=14,
-        color=(0, 0, 1),
-        fontname="helv"
-    )
-
+    # Total de códigos
+    page.insert_text((50, y), f"TOTAL CÓDIGOS ÚNICOS: {len(sorted_codes)}", fontsize=12, color=(0, 0, 1))
+    
     return doc
 
 
