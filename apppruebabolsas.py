@@ -227,7 +227,7 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
     part_summary = create_part_numbers_summary(order_meta)
     if part_summary:
         doc.insert_pdf(part_summary)
-        insert_divider_page(doc, "Main Documents")
+        insert_divider_page(doc, "Main Documents")  # Asegúrate de que esta línea esté presente
 
     if pickup_flag and pickups:
         insert_divider_page(doc, "Customer Pickup Orders")
@@ -245,7 +245,6 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
             doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
 
     return doc
-
 # === Interfaz de Streamlit ===
 st.title("Tequila Build/Shipment PDF Merger")
 
