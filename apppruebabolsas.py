@@ -186,9 +186,9 @@ def create_part_numbers_summary(order_data):
     page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
 
     # Alineamos "Apariciones" a la derecha de forma manual
-    total_width = 540
-    header3_width = fitz.getTextLength(headers[2], fontsize=12, fontname="helv")
-    x_header3 = total_width - header3_width
+    avg_char_width = 6  # ajuste según tamaño de fuente
+    header3_width = len(headers[2]) * avg_char_width
+    x_header3 = 540 - header3_width
     page.insert_text((x_header3, y), headers[2], fontsize=12, fontname="helv")
 
     y += 25
@@ -219,7 +219,7 @@ def create_part_numbers_summary(order_data):
         # Insertar cantidad al final (alineado a la derecha)
         y -= 12
         count_str = str(count)
-        text_width = fitz.getTextLength(count_str, fontsize=10, fontname="helv")
+        text_width = len(count_str) * avg_char_width
         x_count = 540 - text_width
         page.insert_text((x_count, y), count_str, fontsize=10)
         y += 12
