@@ -227,7 +227,6 @@ def create_part_numbers_summary(order_data):
     )
 
     return doc
-
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
