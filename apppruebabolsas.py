@@ -184,7 +184,7 @@ def create_part_numbers_summary(order_data):
     headers = ["Código", "Descripción", "Apariciones"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
     page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
-    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv")
+    page.insert_text((480, y), headers[2], fontsize=12, fontname="helv", align="right")
     y += 25
 
     for part_num in sorted(part_appearances.keys()):
@@ -196,28 +196,41 @@ def create_part_numbers_summary(order_data):
             y = 72
 
         desc = PART_DESCRIPTIONS[part_num]
+
+        # Mostrar código + descripción completa en una sola línea
         full_line = f"{part_num} - {desc}"
+        lines = []
+        while len(full_line) > 60:
+            chunk = full_line[:60]
+            lines.append(chunk)
+            full_line = full_line[60:]
+        lines.append(full_line)
+
+        # Insertar línea(s) de texto
+        for line in lines:
+            page.insert_text((50, y), line, fontsize=10)
+            y += 12
+
+        # Insertar cantidad al final (alineado a la derecha)
+        y -= 12
         count_str = str(count)
-
-        # Aproximación simple para alinear a la derecha
-        avg_char_width = 5.5  # Ancho promedio en puntos (ajustable)
-        text_width = len(count_str) * avg_char_width
-        x_count = 540 - text_width  # Alineado a la derecha
-
-        # Insertar línea completa
-        page.insert_text((50, y), full_line, fontsize=10, fontname="helv")
-        page.insert_text((x_count, y), count_str, fontsize=10, fontname="helv")
-
-        y += 15
+        count_width = fitz.getTextLength(count_str, fontsize=10, fontname="helv")
+        x_count = 540 - count_width
+        page.insert_text((x_count, y), count_str, fontsize=10)
+        y += 12
 
     total = sum(part_appearances.values())
     y += 20
     if y > 750:
         page = doc.new_page(width=595, height=842)
         y = 72
-
-    total_str = f"TOTAL GENERAL DE APARICIONES: {total}"
-    page.insert_text((50, y), total_str, fontsize=14, color=(0, 0, 1), fontname="helv")
+    page.insert_text(
+        (50, y),
+        f"TOTAL GENERAL DE APARICIONES: {total}",
+        fontsize=14,
+        color=(0, 0, 1),
+        fontname="helv"
+    )
 
     return doc
 
