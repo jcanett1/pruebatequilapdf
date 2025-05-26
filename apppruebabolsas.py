@@ -1,7 +1,6 @@
 import streamlit as st
 import fitz  # PyMuPDF
 import re
-import pandas as pd
 from collections import defaultdict
 
 # === Expresiones regulares ===
@@ -10,7 +9,27 @@ SHIPMENT_REGEX = re.compile(r'\bSH(\d{5,})\b')
 PICKUP_REGEX = re.compile(r'Customer\s*Pickup|Cust\s*Pickup|CUSTPICKUP', re.IGNORECASE)
 QUANTITY_REGEX = re.compile(r'(\d+)\s*(?:EA|PCS|PC|Each)', re.IGNORECASE)
 
-# === Definición de partes (diccionario) ===
+# === Funciones auxiliares ===
+def extract_identifiers(text):
+    order_match = ORDER_REGEX.search(text)
+    shipment_match = SHIPMENT_REGEX.search(text)
+    order_id = f"{order_match.group(1).rstrip('-')}-{order_match.group(2)}" if order_match else None
+    shipment_id = f"SH{shipment_match.group(1)}" if shipment_match else None
+    return order_id, shipment_id
+
+
+def extract_part_numbers(text):
+    """Extrae números de parte con coincidencia exacta y sin duplicados por página"""
+    part_counts = {}
+    text_upper = text.upper()
+    for part_num in PART_DESCRIPTIONS.keys():
+        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
+        if re.search(pattern, text_upper):
+            part_counts[part_num] = 1  # Contar solo 1 vez por página
+    return part_counts
+
+
+# === Definición correcta de partes (diccionario) ===
 PART_DESCRIPTIONS = {
     'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
     'B-PG-082-WHT': '2023 PXG Lightweight Cart Bag - White/Black',
@@ -39,44 +58,6 @@ PART_DESCRIPTIONS = {
     'B-UGB8-EP': '2020 Carry Stand Bag - Black'
 }
 
-DESCRIPTION_TO_CODE = {desc: code for code, desc in PART_DESCRIPTIONS.items()}
-
-# === Funciones auxiliares ===
-def extract_identifiers(text):
-    order_match = ORDER_REGEX.search(text)
-    shipment_match = SHIPMENT_REGEX.search(text)
-    order_id = f"{order_match.group(1).rstrip('-')}-{order_match.group(2)}" if order_match else None
-    shipment_id = f"SH{shipment_match.group(1)}" if shipment_match else None
-    return order_id, shipment_id
-
-def normalize_code(code):
-    """Normaliza el formato del código (mayúsculas, guiones)"""
-    code = code.upper().replace(' ', '')
-    if '-' not in code and len(code) > 5:
-        parts = []
-        parts.append(code[:1])
-        parts.append(code[1:3])
-        parts.append(code[3:])
-        code = '-'.join(parts)
-    return code
-
-def extract_part_numbers(text):
-    """Extrae números de parte con coincidencias exactas de códigos completos"""
-    part_sh_numbers = defaultdict(list)
-    text_upper = text.upper()
-
-    # Extraer todos los SH presentes en esta página
-    sh_matches = re.findall(r'SH\d{5,}', text_upper)
-    sh_list = list(set(sh_matches)) if sh_matches else ["Unknown"]
-
-    # Buscar cada código exacto en el texto
-    for code in PART_DESCRIPTIONS:
-        code_pattern = re.compile(r'\b' + re.escape(code) + r'\b', re.IGNORECASE)
-        if code_pattern.search(text_upper):
-            for sh in sh_list:
-                part_sh_numbers[code].append(sh)
-    
-    return part_sh_numbers
 
 def insert_divider_page(doc, label):
     """Crea una página divisoria con texto de etiqueta"""
@@ -89,6 +70,7 @@ def insert_divider_page(doc, label):
         fontname="helv",
         color=(0, 0, 0)
     )
+
 
 def parse_pdf(file_bytes):
     doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -114,7 +96,7 @@ def parse_pdf(file_bytes):
 
         pages.append({
             "number": i,
-            "text": text,
+            "text": text,  # 👈 Muy importante: guardamos el texto
             "order_id": order_id,
             "shipment_id": shipment_id,
             "part_numbers": part_numbers,
@@ -152,6 +134,7 @@ def create_summary_page(order_data, build_keys, shipment_keys, pickup_flag):
         y += 14
     return summary_doc
 
+
 def get_build_order_list(build_pages):
     seen = set()
     order = []
@@ -162,10 +145,11 @@ def get_build_order_list(build_pages):
             order.append(oid)
     return order
 
+
 def group_by_order(pages, classify_pickup=False):
-    order_map = defaultdict(lambda: {"pages": [], "pickup": False, "part_numbers": defaultdict(list)})
+    order_map = defaultdict(lambda: {"pages": [], "pickup": False, "part_numbers": defaultdict(int)})
     for page in pages:
-        oid = page.get("order_id")
+        oid = page.get("order_id")  # Usa .get() para evitar KeyError
         if not oid:
             continue
         order_map[oid]["pages"].append(page)
@@ -173,112 +157,78 @@ def group_by_order(pages, classify_pickup=False):
             text = page.get("text", "")
             if PICKUP_REGEX.search(text):
                 order_map[oid]["pickup"] = True
-        part_numbers = page.get("part_numbers", {})
-        for part_num, sh_list in part_numbers.items():
-            order_map[oid]["part_numbers"][part_num].extend(sh_list)
+        for part_num, qty in page.get("part_numbers", {}).items():
+            order_map[oid]["part_numbers"][part_num] += qty
     return order_map
 
-def create_detailed_codes_report(order_data):
-    """Crea un informe detallado con todos los códigos, sus descripciones y SH asociados"""
-    data = []
-    
-    for oid, order_info in order_data.items():
-        for part_num, sh_list in order_info["part_numbers"].items():
-            for sh in sh_list:
-                data.append({
-                    "Orden": oid,
-                    "Código": part_num,
-                    "Descripción": PART_DESCRIPTIONS.get(part_num, "Desconocida"),
-                    "SH": sh
-                })
-    
-    if not data:
+
+def create_part_numbers_summary(order_data):
+    part_appearances = defaultdict(int)
+
+    for oid, data in order_data.items():
+        part_numbers = data.get("part_numbers", {})
+        for part_num, count in part_numbers.items():
+            if part_num in PART_DESCRIPTIONS:
+                part_appearances[part_num] += count
+
+    if not part_appearances:
         return None
-    
-    # Crear documento PDF
+
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
-    y = 50
-    
-    # Título
-    page.insert_text((50, y), "INFORME DETALLADO DE CÓDIGOS Y SH ASOCIADOS", 
-                    fontsize=16, color=(0, 0, 1), fontname="helv")
-    y += 30
-    
-    # Organizar datos por código
-    df = pd.DataFrame(data)
-    grouped = df.groupby(['Código', 'Descripción'])['SH'].apply(list).reset_index()
-    
-    for _, row in grouped.iterrows():
+    y = 72
+
+    headers = ["Código", "Descripción", "Apariciones"]
+    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv", set_simple=True)
+    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv", set_simple=True)
+    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv", set_simple=True)
+    y += 25
+
+    for part_num in sorted(part_appearances.keys()):
+        count = part_appearances[part_num]
+        if count == 0:
+            continue
         if y > 750:
             page = doc.new_page(width=595, height=842)
-            y = 50
-        
-        # Código y descripción
-        page.insert_text((50, y), f"{row['Código']} - {row['Descripción']}", 
-                        fontsize=12, fontname="helv")
-        y += 20
-        
-        # SH asociados
-        sh_text = ", ".join(sorted(set(row['SH'])))  # Eliminar duplicados y ordenar
-        page.insert_text((60, y), f"SH: {sh_text}", fontsize=10)
-        y += 30
-    
+            y = 72
+
+        desc = PART_DESCRIPTIONS[part_num]
+        page.insert_text((50, y), part_num, fontsize=10)
+
+        if len(desc) > 40:
+            page.insert_text((150, y), desc[:40], fontsize=9)
+            page.insert_text((150, y + 12), desc[40:], fontsize=9)
+        else:
+            page.insert_text((150, y), desc, fontsize=10)
+
+        page.insert_text((450, y), str(count), fontsize=10)
+        y += 25 if len(desc) > 40 else 15
+
+    total = sum(part_appearances.values())
+    page.insert_text(
+        (50, y + 20),
+        f"TOTAL GENERAL DE APARICIONES: {total}",
+        fontsize=14,
+        color=(0, 0, 1),
+        fontname="helv",
+        set_simple=True
+    )
+
     return doc
 
-def display_interactive_codes_table(order_data):
-    """Muestra una tabla interactiva con todos los códigos y SH asociados"""
-    data = []
-    
-    for oid, order_info in order_data.items():
-        for part_num, sh_list in order_info["part_numbers"].items():
-            for sh in sh_list:
-                data.append({
-                    "Orden": oid,
-                    "Código": part_num,
-                    "Descripción": PART_DESCRIPTIONS.get(part_num, "Desconocida"),
-                    "SH": sh
-                })
-    
-    if not data:
-        st.warning("No se encontraron códigos con SH asociados")
-        return
-    
-    df = pd.DataFrame(data)
-    
-    st.subheader("Informe Detallado de Códigos y SH Asociados")
-    
-    # Mostrar tabla interactiva
-    st.dataframe(
-        df.sort_values(by=["Código", "SH"]),
-        height=600,
-        use_container_width=True,
-        column_config={
-            "Descripción": st.column_config.TextColumn(width="large")
-        }
-    )
-    
-    # Opción para descargar como CSV
-    csv = df.to_csv(index=False, encoding='utf-8')
-    st.download_button(
-        "Descargar como CSV",
-        data=csv,
-        file_name='informe_codigos_sh.csv',
-        mime='text/csv'
-    )
 
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
 
-    # Insertar informe detallado de códigos al inicio
-    codes_report = create_detailed_codes_report(order_meta)
-    if codes_report:
-        doc.insert_pdf(codes_report)
-        insert_divider_page(doc, "Documentos Principales")
+    # Insertar resumen al inicio
+    part_summary = create_part_numbers_summary(order_meta)
+    if part_summary:
+        doc.insert_pdf(part_summary)
+        insert_divider_page(doc, "Main Documents")
 
     if pickup_flag and pickups:
-        insert_divider_page(doc, "Órdenes de Customer Pickup")
+        insert_divider_page(doc, "Customer Pickup Orders")
         for oid in pickups:
             for p in build_map.get(oid, {}).get("pages", []):
                 doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
@@ -294,51 +244,40 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
 
     return doc
 
+
 # === Interfaz de Streamlit ===
-st.title("Tequila - Procesador de PDFs")
+st.title("Tequila Build/Shipment PDF Merger")
 
-# Upload de archivos
-col1, col2 = st.columns(2)
-with col1:
-    build_file = st.file_uploader("Subir Build Sheets PDF", type="pdf")
-with col2:
-    ship_file = st.file_uploader("Subir Shipment Pick Lists PDF", type="pdf")
+build_file = st.file_uploader("Upload Build Sheets PDF", type="pdf")
+ship_file = st.file_uploader("Upload Shipment Pick Lists PDF", type="pdf")
+pickup_flag = st.checkbox("Summarize Customer Pickup orders", value=True)
 
-pickup_flag = st.checkbox("Incluir resumen de Customer Pickup", value=True)
-
-if build_file and ship_file:
-    # Procesar archivos
+if build_file and ship_file and st.button("Generate Merged Output"):
     build_bytes = build_file.read()
     ship_bytes = ship_file.read()
 
     build_pages = parse_pdf(build_bytes)
     ship_pages = parse_pdf(ship_bytes)
 
-    # Combinar y procesar todas las páginas
-    all_pages = build_pages + ship_pages
-    order_data = group_by_order(all_pages, classify_pickup=pickup_flag)
+    original_pages = build_pages + ship_pages
+    all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
 
-    # Mostrar informe interactivo
-    display_interactive_codes_table(order_data)
+    build_map = group_by_order(build_pages)
+    ship_map = group_by_order(ship_pages)
 
-    # Generar PDF combinado
-    if st.button("Generar PDF Combinado"):
-        build_map = group_by_order(build_pages)
-        ship_map = group_by_order(ship_pages)
-        build_order = get_build_order_list(build_pages)
+    build_order = get_build_order_list(build_pages)
 
-        # Generar resúmenes
-        summary = create_summary_page(order_data, build_map.keys(), ship_map.keys(), pickup_flag)
-        merged = merge_documents(build_order, build_map, ship_map, order_data, pickup_flag)
+    # Generar resúmenes
+    summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
+    merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag)
 
-        # Insertar resumen al inicio
-        if summary:
-            merged.insert_pdf(summary, start_at=0)
+    # Insertar resumen al inicio
+    if summary:
+        merged.insert_pdf(summary, start_at=0)
 
-        # Botón de descarga
-        st.download_button(
-            "Descargar PDF Combinado",
-            data=merged.tobytes(),
-            file_name="Tequila_Informe_Completo.pdf",
-            mime="application/pdf"
-        )
+    # Botón de descarga
+    st.download_button(
+        "Download Merged Output PDF",
+        data=merged.tobytes(),
+        file_name="Tequila_Merged_Output.pdf"
+    )
