@@ -177,74 +177,56 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    # Encabezado principal
-    page.insert_text((50, y), "CÓDIGOS DETALLADOS Y AGRUPADOS", fontsize=14, fontname="helv", color=(0, 0, 1))
-    y += 20
+    # Encabezados
+    headers = ["Código", "Descripción", "Apariciones"]
+    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
+    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
+    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv")
+    y += 25
 
-    # === Mostrar códigos individuales ===
-    grouped_by_prefix = defaultdict(int)
+    avg_char_width = 6  # Aproximación del ancho promedio de caracteres
 
     for part_num in sorted(part_appearances.keys()):
         count = part_appearances[part_num]
-        desc = PART_DESCRIPTIONS[part_num]
-
-        # Obtener el prefijo base (ej: B-PG-172)
-        prefix = part_num.split('-')[:3]
-        prefix = '-'.join(prefix)  # 'B-PG-172'
-
-        # Mostrar en PDF
-        full_line = f"{part_num} - {desc}"
-        lines = []
-        while len(full_line) > 60:
-            chunk = full_line[:60]
-            lines.append(chunk)
-            full_line = full_line[60:]
-        lines.append(full_line)
-
-        for line in lines:
-            if y > 750:
-                page = doc.new_page(width=595, height=842)
-                y = 72
-            page.insert_text((50, y), line, fontsize=10)
-            y += 12
-
-        # Retroceder una línea para poner cantidad
-        y -= 12
-        count_str = str(count)
-        page.insert_text((530, y), count_str, fontsize=10, align=3)
-        y += 12
-
-        # Agregar al conteo del grupo
-        grouped_by_prefix[prefix] += count
-
-    # === Insertar página nueva si no hay espacio ===
-    if y > 750:
-        page = doc.new_page(width=595, height=842)
-        y = 72
-
-    y += 20
-    page.insert_text((50, y), "TOTAL POR GRUPO DE CÓDIGO", fontsize=14, fontname="helv", color=(0, 0, 1))
-    y += 20
-
-    for prefix, total in sorted(grouped_by_prefix.items()):
+        if count == 0:
+            continue
         if y > 750:
             page = doc.new_page(width=595, height=842)
             y = 72
-        line = f"{prefix} → Total: {total}"
-        page.insert_text((50, y), line, fontsize=12)
-        y += 18
 
-    # === Total general ===
-    total_general = sum(part_appearances.values())
+        desc = PART_DESCRIPTIONS[part_num]
+
+        # Insertar código
+        page.insert_text((50, y), part_num, fontsize=10)
+
+        # Insertar descripción (cortada si es muy larga)
+        if len(desc) > 40:
+            page.insert_text((150, y), desc[:40], fontsize=9)
+            y += 12
+            page.insert_text((150, y), desc[40:], fontsize=9)
+            y -= 12  # Retroceder para alinear número
+        else:
+            page.insert_text((150, y), desc, fontsize=10)
+
+        # Alinear apariciones a la derecha
+        count_str = str(count)
+        text_width = len(count_str) * avg_char_width
+        x_count = 530 - text_width
+        page.insert_text((x_count, y), count_str, fontsize=10)
+
+        y += 25 if len(desc) > 40 else 15
+
+    total = sum(part_appearances.values())
     y += 20
     if y > 750:
         page = doc.new_page(width=595, height=842)
         y = 72
+
     page.insert_text(
         (50, y),
-        f"TOTAL GENERAL DE APARICIONES: {total_general}",
+        f"TOTAL GENERAL DE APARICIONES: {total}",
         fontsize=14,
-        color=(1, 0, 0),
+        color=(0, 0, 1),
         fontname="helv"
     )
 
