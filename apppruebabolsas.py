@@ -17,7 +17,6 @@ def extract_identifiers(text):
     shipment_id = f"SH{shipment_match.group(1)}" if shipment_match else None
     return order_id, shipment_id
 
-
 def extract_part_numbers(text):
     """Extrae números de parte con coincidencia EXACTA del código + descripción"""
     part_sh_numbers = defaultdict(list)
@@ -32,6 +31,7 @@ def extract_part_numbers(text):
             if sh_number:
                 part_sh_numbers[full_key].append(sh_number.group())
 
+    return part_sh_numbers
 
 # === Definición correcta de partes (diccionario) ===
 PART_DESCRIPTIONS = {
@@ -62,7 +62,6 @@ PART_DESCRIPTIONS = {
     'B-UGB8-EP': '2020 Carry Stand Bag - Black'
 }
 
-
 def insert_divider_page(doc, label):
     """Crea una página divisoria con texto de etiqueta"""
     page = doc.new_page()
@@ -74,7 +73,6 @@ def insert_divider_page(doc, label):
         fontname="helv",
         color=(0, 0, 0)
     )
-
 
 def parse_pdf(file_bytes):
     doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -138,7 +136,6 @@ def create_summary_page(order_data, build_keys, shipment_keys, pickup_flag):
         y += 14
     return summary_doc
 
-
 def get_build_order_list(build_pages):
     seen = set()
     order = []
@@ -149,33 +146,18 @@ def get_build_order_list(build_pages):
             order.append(oid)
     return order
 
-
 def group_by_order(pages, classify_pickup=False):
-    # Asegúrate de que pages sea una lista de diccionarios
-    if not isinstance(pages, list):
-        raise ValueError("pages debe ser una lista de diccionarios")
-
+    order_data = defaultdict(dict)
     for page in pages:
-        # Verifica que page sea un diccionario
-        if not isinstance(page, dict):
-            raise ValueError("Cada página debe ser un diccionario")
-
-        # Obtén part_numbers con un valor predeterminado de diccionario vacío
-        part_numbers = page.get("part_numbers", {})
-
-        # Verifica que part_numbers sea un diccionario
-        if not isinstance(part_numbers, dict):
-            raise ValueError("part_numbers debe ser un diccionario")
-
-        # Itera sobre los elementos de part_numbers
-        for part_num, qty in part_numbers.items():
-            # Tu lógica aquí
-            pass
-
-
-
-from collections import defaultdict
-import fitz  # Asegúrate de tener esta importación si no está arriba
+        oid = page["order_id"]
+        if oid:
+            if "part_numbers" not in order_data[oid]:
+                order_data[oid]["part_numbers"] = defaultdict(list)
+            for part_num, sh_list in page["part_numbers"].items():
+                order_data[oid]["part_numbers"][part_num].extend(sh_list)
+            if classify_pickup:
+                order_data[oid]["pickup"] = bool(PICKUP_REGEX.search(page["text"]))
+    return order_data
 
 def create_part_numbers_summary(order_data):
     part_sh_numbers = defaultdict(list)
@@ -237,7 +219,6 @@ def create_part_numbers_summary(order_data):
 
     return doc
 
-
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
@@ -265,7 +246,6 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
 
     return doc
 
-
 # === Interfaz de Streamlit ===
 st.title("Tequila Build/Shipment PDF Merger")
 
@@ -274,31 +254,35 @@ ship_file = st.file_uploader("Upload Shipment Pick Lists PDF", type="pdf")
 pickup_flag = st.checkbox("Summarize Customer Pickup orders", value=True)
 
 if build_file and ship_file and st.button("Generate Merged Output"):
-    build_bytes = build_file.read()
-    ship_bytes = ship_file.read()
+    try:
+        build_bytes = build_file.read()
+        ship_bytes = ship_file.read()
 
-    build_pages = parse_pdf(build_bytes)
-    ship_pages = parse_pdf(ship_bytes)
+        build_pages = parse_pdf(build_bytes)
+        ship_pages = parse_pdf(ship_bytes)
 
-    original_pages = build_pages + ship_pages
-    all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
+        original_pages = build_pages + ship_pages
+        all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
 
-    build_map = group_by_order(build_pages)
-    ship_map = group_by_order(ship_pages)
+        build_map = group_by_order(build_pages)
+        ship_map = group_by_order(ship_pages)
 
-    build_order = get_build_order_list(build_pages)
+        build_order = get_build_order_list(build_pages)
 
-    # Generar resúmenes
-    summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
-    merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag)
+        # Generar resúmenes
+        summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
+        merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag)
 
-    # Insertar resumen al inicio
-    if summary:
-        merged.insert_pdf(summary, start_at=0)
+        # Insertar resumen al inicio
+        if summary:
+            merged.insert_pdf(summary, start_at=0)
 
-    # Botón de descarga
-    st.download_button(
-        "Download Merged Output PDF",
-        data=merged.tobytes(),
-        file_name="Tequila_Merged_Output.pdf"
-    )
+        # Botón de descarga
+        st.download_button(
+            "Download Merged Output PDF",
+            data=merged.tobytes(),
+            file_name="Tequila_Merged_Output.pdf"
+        )
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+
