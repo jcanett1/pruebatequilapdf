@@ -170,7 +170,7 @@ def group_by_order(pages, classify_pickup=False):
 def create_part_numbers_summary(order_data):
     part_sh_numbers = defaultdict(list)
 
-    # Agregar todas las SH donde aparece cada código
+    # Recolección de todos los SH donde aparece cada parte
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
         for part_num, sh_list in part_numbers.items():
@@ -184,16 +184,19 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
+    # Encabezado del resumen
     headers = ["Código + Descripción", "Números de SH"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
-    page.insert_text((500, y), headers[1], fontsize=12, fontname="helv")
+    page.insert_text((450, y), headers[1], fontsize=12, fontname="helv")
     y += 25
 
-    avg_char_width = 6  # Aproximación del ancho promedio de caracteres
+    avg_char_width = 5.5  # Aproximación del ancho promedio de caracteres
 
+    # Mostrar cada parte
     for part_num in sorted(part_sh_numbers.keys()):
         sh_list = part_sh_numbers[part_num]
-        if not sh_list:
+        unique_sh = list(set(sh_list))  # Eliminar duplicados
+        if not unique_sh:
             continue
         if y > 750:
             page = doc.new_page(width=595, height=842)
@@ -202,6 +205,7 @@ def create_part_numbers_summary(order_data):
         desc = PART_DESCRIPTIONS[part_num]
         full_line = f"{part_num} - {desc}"
 
+        # Si el texto es muy largo, dividimos en varias líneas
         lines = []
         temp = full_line
         while len(temp) > 60:
@@ -214,12 +218,27 @@ def create_part_numbers_summary(order_data):
             page.insert_text((50, y), line, fontsize=10)
             y += 12
 
-        y -= 12
-        sh_str = ", ".join(set(sh_list))  # Eliminar duplicados
+        y -= 12  # Retrocedemos una línea para insertar los SH a la derecha
+        sh_str = ", ".join(unique_sh)
         text_width = len(sh_str) * avg_char_width
-        x_sh = 540 - text_width
+        x_sh = 540 - text_width  # Alinea a la derecha
         page.insert_text((x_sh, y), sh_str, fontsize=10)
         y += 12
+
+    # Total general de códigos únicos
+    y += 20
+    if y > 750:
+        page = doc.new_page(width=595, height=842)
+        y = 72
+
+    total_unique = len(part_sh_numbers)
+    page.insert_text(
+        (50, y),
+        f"TOTAL DE CÓDIGOS ÚNICOS: {total_unique}",
+        fontsize=14,
+        color=(0, 0, 1),
+        fontname="helv"
+    )
 
     return doc
 
