@@ -134,6 +134,35 @@ def parse_pdf(file_bytes):
 
     return pages, relations, two_day_sh
 
+def display_interactive_table(relations):
+    """Muestra una tabla interactiva con las relaciones"""
+    if not relations:
+        st.warning("No se encontraron relaciones entre órdenes, códigos y SH")
+        return
+    
+    df = pd.DataFrame(relations)
+    df = df.sort_values(by=["Orden", "Código"])
+    
+    st.subheader("Relación Detallada de Órdenes, Códigos y SH")
+    
+    st.dataframe(
+        df,
+        column_config={
+            "Descripción": st.column_config.TextColumn(width="large"),
+            "SH": st.column_config.TextColumn(width="medium")
+        },
+        hide_index=True,
+        use_container_width=True
+    )
+    
+    csv = df.to_csv(index=False, encoding='utf-8')
+    st.download_button(
+        "Descargar como CSV",
+        data=csv,
+        file_name='relacion_ordenes_codigos_sh.csv',
+        mime='text/csv'
+    )
+
 # === Nueva función para crear página de SH 2 day ===
 def create_2day_shipping_page(two_day_sh_list):
     """Crea una página con la lista de SH con método 2 day"""
