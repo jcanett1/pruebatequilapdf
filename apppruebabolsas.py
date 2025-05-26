@@ -1,35 +1,16 @@
 import streamlit as st
 import fitz  # PyMuPDF
 import re
+import pandas as pd
 from collections import defaultdict
 
 # === Expresiones regulares ===
 ORDER_REGEX = re.compile(r'\b(SO-|USS|SOC|AMZ)-?(\d+)\b')
-SHIPMENT_REGEX = re.compile(r'\bSH(\d{5,})\b')
+SHIPMENT_REGEX = re.compile(r'\b(SH\d{5,})\b')  # Modificado para capturar el formato exacto
 PICKUP_REGEX = re.compile(r'Customer\s*Pickup|Cust\s*Pickup|CUSTPICKUP', re.IGNORECASE)
 QUANTITY_REGEX = re.compile(r'(\d+)\s*(?:EA|PCS|PC|Each)', re.IGNORECASE)
 
-# === Funciones auxiliares ===
-def extract_identifiers(text):
-    order_match = ORDER_REGEX.search(text)
-    shipment_match = SHIPMENT_REGEX.search(text)
-    order_id = f"{order_match.group(1).rstrip('-')}-{order_match.group(2)}" if order_match else None
-    shipment_id = f"SH{shipment_match.group(1)}" if shipment_match else None
-    return order_id, shipment_id
-
-
-def extract_part_numbers(text):
-    """Extrae números de parte con coincidencia exacta y sin duplicados por página"""
-    part_counts = {}
-    text_upper = text.upper()
-    for part_num in PART_DESCRIPTIONS.keys():
-        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
-        if re.search(pattern, text_upper):
-            part_counts[part_num] = 1  # Contar solo 1 vez por página
-    return part_counts
-
-
-# === Definición correcta de partes (diccionario) ===
+# === Definición de partes (diccionario) ===
 PART_DESCRIPTIONS = {
     'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
     'B-PG-082-WHT': '2023 PXG Lightweight Cart Bag - White/Black',
@@ -58,6 +39,40 @@ PART_DESCRIPTIONS = {
     'B-UGB8-EP': '2020 Carry Stand Bag - Black'
 }
 
+# === Funciones auxiliares ===
+def extract_identifiers(text):
+    order_match = ORDER_REGEX.search(text)
+    shipment_match = SHIPMENT_REGEX.search(text)
+    order_id = f"{order_match.group(1).rstrip('-')}-{order_match.group(2)}" if order_match else None
+    shipment_id = shipment_match.group(1) if shipment_match else None  # Mantener formato original del SH
+    return order_id, shipment_id
+
+def extract_part_numbers(text):
+    """Extrae números de parte con coincidencia exacta y sin duplicados por página"""
+    part_counts = {}
+    text_upper = text.upper()
+    for part_num in PART_DESCRIPTIONS.keys():
+        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
+        if re.search(pattern, text_upper):
+            part_counts[part_num] = 1  # Contar solo 1 vez por página
+    return part_counts
+
+def extract_relations(text, order_id, shipment_id):
+    """Extrae relaciones entre códigos, órdenes y SH para la tabla detallada"""
+    relations = []
+    text_upper = text.upper()
+    
+    for part_num in PART_DESCRIPTIONS:
+        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
+        if re.search(pattern, text_upper) and order_id and shipment_id:
+            relations.append({
+                "Orden": order_id,
+                "Código": part_num,
+                "Descripción": PART_DESCRIPTIONS[part_num],
+                "SH": shipment_id
+            })
+    
+    return relations
 
 def insert_divider_page(doc, label):
     """Crea una página divisoria con texto de etiqueta"""
@@ -71,10 +86,10 @@ def insert_divider_page(doc, label):
         color=(0, 0, 0)
     )
 
-
 def parse_pdf(file_bytes):
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     pages = []
+    relations = []  # Para almacenar las relaciones para la tabla
     last_order_id = None
     last_shipment_id = None
 
@@ -82,8 +97,7 @@ def parse_pdf(file_bytes):
         page = doc[i]
         text = page.get_text()
         order_id, shipment_id = extract_identifiers(text)
-        part_numbers = extract_part_numbers(text)
-
+        
         if not order_id:
             order_id = last_order_id
         else:
@@ -94,9 +108,13 @@ def parse_pdf(file_bytes):
         else:
             last_shipment_id = shipment_id
 
+        part_numbers = extract_part_numbers(text)
+        page_relations = extract_relations(text, order_id, shipment_id)
+        relations.extend(page_relations)
+
         pages.append({
             "number": i,
-            "text": text,  # 👈 Muy importante: guardamos el texto
+            "text": text,
             "order_id": order_id,
             "shipment_id": shipment_id,
             "part_numbers": part_numbers,
@@ -104,7 +122,7 @@ def parse_pdf(file_bytes):
             "parent": doc
         })
 
-    return pages
+    return pages, relations
 
 def create_summary_page(order_data, build_keys, shipment_keys, pickup_flag):
     all_orders = set(build_keys) | set(shipment_keys)
@@ -134,7 +152,6 @@ def create_summary_page(order_data, build_keys, shipment_keys, pickup_flag):
         y += 14
     return summary_doc
 
-
 def get_build_order_list(build_pages):
     seen = set()
     order = []
@@ -145,11 +162,10 @@ def get_build_order_list(build_pages):
             order.append(oid)
     return order
 
-
 def group_by_order(pages, classify_pickup=False):
     order_map = defaultdict(lambda: {"pages": [], "pickup": False, "part_numbers": defaultdict(int)})
     for page in pages:
-        oid = page.get("order_id")  # Usa .get() para evitar KeyError
+        oid = page.get("order_id")
         if not oid:
             continue
         order_map[oid]["pages"].append(page)
@@ -160,7 +176,6 @@ def group_by_order(pages, classify_pickup=False):
         for part_num, qty in page.get("part_numbers", {}).items():
             order_map[oid]["part_numbers"][part_num] += qty
     return order_map
-
 
 def create_part_numbers_summary(order_data):
     part_appearances = defaultdict(int)
@@ -216,16 +231,70 @@ def create_part_numbers_summary(order_data):
 
     return doc
 
+def create_relations_table(relations):
+    """Crea una tabla PDF con las relaciones orden-código-SH"""
+    if not relations:
+        return None
+    
+    # Convertir a DataFrame para ordenar
+    df = pd.DataFrame(relations)
+    df = df.sort_values(by=["Orden", "Código"])
+    
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    y = 50
+    
+    # Título
+    page.insert_text((50, y), "RELACIÓN ÓRDENES - CÓDIGOS - SH", 
+                    fontsize=16, color=(0, 0, 1), fontname="helv")
+    y += 30
+    
+    # Encabezados
+    headers = ["Orden", "Código", "Descripción", "SH"]
+    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
+    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
+    page.insert_text((300, y), headers[2], fontsize=12, fontname="helv")
+    page.insert_text((500, y), headers[3], fontsize=12, fontname="helv")
+    y += 20
+    
+    # Datos
+    for _, row in df.iterrows():
+        if y > 750:
+            page = doc.new_page(width=595, height=842)
+            y = 50
+            
+        page.insert_text((50, y), row["Orden"], fontsize=10)
+        page.insert_text((150, y), row["Código"], fontsize=10)
+        
+        # Descripción en múltiples líneas si es necesario
+        desc = row["Descripción"]
+        if len(desc) > 30:
+            page.insert_text((300, y), desc[:30], fontsize=9)
+            page.insert_text((300, y + 12), desc[30:], fontsize=9)
+            y += 12
+        else:
+            page.insert_text((300, y), desc, fontsize=10)
+            
+        page.insert_text((500, y), row["SH"], fontsize=10)
+        y += 25 if len(desc) > 30 else 15
+    
+    return doc
 
-def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
+def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, relations):
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
 
-    # Insertar resumen al inicio
+    # Insertar tabla de relaciones al inicio
+    relations_table = create_relations_table(relations)
+    if relations_table:
+        doc.insert_pdf(relations_table)
+        insert_divider_page(doc, "Resumen de Partes")
+    
+    # Insertar resumen de partes
     part_summary = create_part_numbers_summary(order_meta)
     if part_summary:
         doc.insert_pdf(part_summary)
-        insert_divider_page(doc, "Main Documents")
+        insert_divider_page(doc, "Documentos Principales")
 
     if pickup_flag and pickups:
         insert_divider_page(doc, "Customer Pickup Orders")
@@ -244,40 +313,76 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
 
     return doc
 
+def display_interactive_table(relations):
+    """Muestra una tabla interactiva con las relaciones"""
+    if not relations:
+        st.warning("No se encontraron relaciones entre órdenes, códigos y SH")
+        return
+    
+    df = pd.DataFrame(relations)
+    df = df.sort_values(by=["Orden", "Código"])
+    
+    st.subheader("Relación Detallada de Órdenes, Códigos y SH")
+    
+    # Mostrar tabla interactiva
+    st.dataframe(
+        df,
+        column_config={
+            "Descripción": st.column_config.TextColumn(width="large"),
+            "SH": st.column_config.TextColumn(width="medium")
+        },
+        hide_index=True,
+        use_container_width=True
+    )
+    
+    # Opción para descargar
+    csv = df.to_csv(index=False, encoding='utf-8')
+    st.download_button(
+        "Descargar como CSV",
+        data=csv,
+        file_name='relacion_ordenes_codigos_sh.csv',
+        mime='text/csv'
+    )
 
 # === Interfaz de Streamlit ===
-st.title("Tequila Build/Shipment PDF Merger")
+st.title("Tequila Build/Shipment PDF Processor")
 
 build_file = st.file_uploader("Upload Build Sheets PDF", type="pdf")
 ship_file = st.file_uploader("Upload Shipment Pick Lists PDF", type="pdf")
 pickup_flag = st.checkbox("Summarize Customer Pickup orders", value=True)
 
-if build_file and ship_file and st.button("Generate Merged Output"):
+if build_file and ship_file:
     build_bytes = build_file.read()
     ship_bytes = ship_file.read()
 
-    build_pages = parse_pdf(build_bytes)
-    ship_pages = parse_pdf(ship_bytes)
+    # Procesar ambos PDFs
+    build_pages, build_relations = parse_pdf(build_bytes)
+    ship_pages, ship_relations = parse_pdf(ship_bytes)
 
+    # Combinar todo
     original_pages = build_pages + ship_pages
+    all_relations = build_relations + ship_relations
     all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
 
-    build_map = group_by_order(build_pages)
-    ship_map = group_by_order(ship_pages)
+    # Mostrar tabla interactiva
+    display_interactive_table(all_relations)
 
-    build_order = get_build_order_list(build_pages)
+    if st.button("Generate Merged Output"):
+        build_map = group_by_order(build_pages)
+        ship_map = group_by_order(ship_pages)
+        build_order = get_build_order_list(build_pages)
 
-    # Generar resúmenes
-    summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
-    merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag)
+        # Generar resúmenes
+        summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
+        merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag, all_relations)
 
-    # Insertar resumen al inicio
-    if summary:
-        merged.insert_pdf(summary, start_at=0)
+        # Insertar resumen al inicio
+        if summary:
+            merged.insert_pdf(summary, start_at=0)
 
-    # Botón de descarga
-    st.download_button(
-        "Download Merged Output PDF",
-        data=merged.tobytes(),
-        file_name="Tequila_Merged_Output.pdf"
-    )
+        # Botón de descarga
+        st.download_button(
+            "Download Merged Output PDF",
+            data=merged.tobytes(),
+            file_name="Tequila_Merged_Output.pdf"
+        )
