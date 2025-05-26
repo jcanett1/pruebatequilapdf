@@ -19,34 +19,45 @@ def extract_identifiers(text):
 
 
 def extract_part_numbers(text):
-    """Extrae números de parte buscando coincidencias exactas de códigos completos"""
+    """Extrae números de parte con coincidencias exactas de códigos completos"""
     part_sh_numbers = defaultdict(list)
-
     text_upper = text.upper()
 
     # Extraer todos los SH presentes en esta página
-    sh_matches = re.findall(r'SH\d+', text_upper)
-    sh_list = list(set(sh_matches))  # Eliminar duplicados
-    if not sh_list:
-        sh_list = ["Unknown"]
+    sh_matches = re.findall(r'SH\d{5,}', text_upper)  # Solo SH con al menos 5 dígitos
+    sh_list = list(set(sh_matches)) if sh_matches else ["Unknown"]
 
-    # Primero buscar por códigos exactos
-    for part_num in PART_DESCRIPTIONS.keys():
-        # Usamos \b para coincidencia de palabra completa y escapamos el código
-        escaped = re.escape(part_num)
-        if re.search(rf'\b{escaped}\b', text_upper):
+    # Patrón para buscar códigos exactos con límites de palabra
+    code_pattern = re.compile(r'\b({})\b'.format('|'.join(
+        [re.escape(code) for code in PART_DESCRIPTIONS.keys()]
+    )), flags=re.IGNORECASE)
+
+    # Encontrar todas las coincidencias exactas de códigos
+    found_codes = code_pattern.findall(text_upper)
+    
+    # Para cada código encontrado, asociar los SH de esta página
+    for code in set(found_codes):  # Eliminar duplicados en la misma página
+        # Normalizar el código (por si hay variaciones de mayúsculas/guiones)
+        normalized_code = normalize_code(code)
+        if normalized_code in PART_DESCRIPTIONS:
             for sh in sh_list:
-                part_sh_numbers[part_num].append(sh)
-
-    # Si no se encontró nada, intentar con descripciones como respaldo
-    if not part_sh_numbers:
-        for description, part_num in DESCRIPTION_TO_CODE.items():
-            escaped = re.escape(description)
-            if re.search(rf'\b{escaped}\b', text_upper):
-                for sh in sh_list:
-                    part_sh_numbers[part_num].append(sh)
+                part_sh_numbers[normalized_code].append(sh)
 
     return part_sh_numbers
+
+def normalize_code(code):
+    """Normaliza el formato del código (mayúsculas, guiones)"""
+    # Convertir a mayúsculas y estandarizar guiones
+    code = code.upper().replace(' ', '')
+    # Asegurar que los guiones sean consistentes (ej: BPG172 vs B-PG-172)
+    if '-' not in code and len(code) > 5:
+        # Insertar guiones en posiciones estándar (ej: BPG172 -> B-PG-172)
+        parts = []
+        parts.append(code[:1])  # B
+        parts.append(code[1:3])  # PG
+        parts.append(code[3:])  # 172...
+        code = '-'.join(parts)
+    return code
 # === Definición correcta de partes (diccionario) ===
 PART_DESCRIPTIONS = {
     'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
