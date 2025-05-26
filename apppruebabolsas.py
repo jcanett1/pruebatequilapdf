@@ -177,7 +177,7 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    # === Sección 1: Códigos detallados ===
+    # === Sección 1: Códigos individuales ===
     page.insert_text((50, y), "CÓDIGOS DETALLADOS", fontsize=14, fontname="helv", color=(0, 0, 1))
     y += 20
 
@@ -191,8 +191,8 @@ def create_part_numbers_summary(order_data):
 
         desc = PART_DESCRIPTIONS[part_num]
         line = f"{part_num} - {desc} → {count}"
-        
-        # Si es muy largo, dividimos en varias líneas
+
+        # Si la línea es muy larga, dividimos en varias
         while len(line) > 70:
             chunk = line[:70]
             page.insert_text((50, y), chunk, fontsize=10)
@@ -201,19 +201,19 @@ def create_part_numbers_summary(order_data):
         page.insert_text((50, y), line, fontsize=10)
         y += 16
 
-    # === Sección 2: Agrupación por prefijo ===
+    # === Sección 2: Agrupados por prefijo ===
     y += 20
     if y > 750:
         page = doc.new_page(width=595, height=842)
         y = 72
 
-    page.insert_text((50, y), "AGRUPACIÓN POR PREFIJO", fontsize=14, fontname="helv", color=(0, 0, 1))
+    page.insert_text((50, y), "TOTAL POR PREFIJO", fontsize=14, fontname="helv", color=(0, 0, 1))
     y += 20
 
     grouped_by_prefix = defaultdict(int)
 
     for part_num, count in part_appearances.items():
-        prefix = '-'.join(part_num.split('-')[:3])  # Ej: B-PG-172
+        prefix = '-'.join(part_num.split('-')[:3])  # Por ejemplo: B-PG-172
         grouped_by_prefix[prefix] += count
 
     for prefix in sorted(grouped_by_prefix.keys()):
@@ -225,7 +225,7 @@ def create_part_numbers_summary(order_data):
         page.insert_text((50, y), line, fontsize=12)
         y += 16
 
-    # === Total general ===
+    # === Sección 3: Total general ===
     y += 20
     if y > 750:
         page = doc.new_page(width=595, height=842)
@@ -240,7 +240,6 @@ def create_part_numbers_summary(order_data):
         fontname="helv"
     )
 
-    return doc
     return doc
 
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
