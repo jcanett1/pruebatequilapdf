@@ -170,11 +170,12 @@ import fitz  # Asegúrate de tener esta importación si no está arriba
 def create_part_numbers_summary(order_data):
     part_appearances = defaultdict(int)
 
-    # Contar apariciones por "código + descripción"
+    # Contar cuántas veces aparece cada código
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
-        for full_key, count in part_numbers.items():
-            part_appearances[full_key] += count
+        for part_num, count in part_numbers.items():
+            if part_num in PART_DESCRIPTIONS:
+                part_appearances[part_num] += count
 
     if not part_appearances:
         return None
@@ -192,29 +193,31 @@ def create_part_numbers_summary(order_data):
     avg_char_width = 6  # Aproximación del ancho promedio de caracteres
 
     # Mostrar cada código + descripción
-    for full_key in sorted(part_appearances.keys()):
-        count = part_appearances[full_key]
+    for part_num in sorted(part_appearances.keys()):
+        count = part_appearances[part_num]
         if count == 0:
             continue
         if y > 750:
             page = doc.new_page(width=595, height=842)
             y = 72
 
-        # Dividir en líneas si es muy larga
+        desc = PART_DESCRIPTIONS[part_num]
+        full_line = f"{part_num} - {desc}"
+
+        # Si es muy largo, dividimos en varias líneas
         lines = []
-        temp = full_key
+        temp = full_line
         while len(temp) > 60:
             chunk = temp[:60]
             lines.append(chunk)
             temp = temp[60:]
         lines.append(temp)
 
-        # Insertar texto línea por línea
         for line in lines:
             page.insert_text((50, y), line, fontsize=10)
             y += 12
 
-        # Retroceder una línea para insertar cantidad alineada
+        # Retroceder una línea para insertar cantidad
         y -= 12
         count_str = str(count)
         text_width = len(count_str) * avg_char_width
@@ -238,6 +241,8 @@ def create_part_numbers_summary(order_data):
     )
 
     return doc
+
+
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
