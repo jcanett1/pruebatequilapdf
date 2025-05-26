@@ -1,13 +1,16 @@
 import streamlit as st
 import fitz  # PyMuPDF
 import re
+import pandas as pd
 from collections import defaultdict
 
 # === Expresiones regulares ===
 ORDER_REGEX = re.compile(r'\b(SO-|USS|SOC|AMZ)-?(\d+)\b')
-SHIPMENT_REGEX = re.compile(r'\bSH(\d{5,})\b')
+SHIPMENT_REGEX = re.compile(r'\b(SH\d{5,})\b')
 PICKUP_REGEX = re.compile(r'Customer\s*Pickup|Cust\s*Pickup|CUSTPICKUP', re.IGNORECASE)
 QUANTITY_REGEX = re.compile(r'(\d+)\s*(?:EA|PCS|PC|Each)', re.IGNORECASE)
+SHIPPING_2DAY_REGEX = re.compile(r'Shipping\s*Method:\s*2\s*day', re.IGNORECASE)
+
 
 # === Funciones auxiliares ===
 def extract_identifiers(text):
@@ -75,6 +78,8 @@ def insert_divider_page(doc, label):
 def parse_pdf(file_bytes):
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     pages = []
+    relations = []
+    two_day_sh = set()  # Para almacenar SH con método 2 day
     last_order_id = None
     last_shipment_id = None
 
@@ -82,8 +87,11 @@ def parse_pdf(file_bytes):
         page = doc[i]
         text = page.get_text()
         order_id, shipment_id = extract_identifiers(text)
-        part_numbers = extract_part_numbers(text)
-
+        
+        # Detectar shipping method 2 day
+        if SHIPPING_2DAY_REGEX.search(text) and shipment_id:
+            two_day_sh.add(shipment_id)
+        
         if not order_id:
             order_id = last_order_id
         else:
@@ -94,17 +102,50 @@ def parse_pdf(file_bytes):
         else:
             last_shipment_id = shipment_id
 
+        part_numbers = extract_part_numbers(text)
+        page_relations = extract_relations(text, order_id, shipment_id)
+        relations.extend(page_relations)
+
         pages.append({
             "number": i,
-            "text": text,  # 👈 Muy importante: guardamos el texto
+            "text": text,
             "order_id": order_id,
             "shipment_id": shipment_id,
             "part_numbers": part_numbers,
             "page": page,
-            "parent": doc
+            "parent": doc,
+            "is_2day": SHIPPING_2DAY_REGEX.search(text) is not None
         })
 
-    return pages
+    return pages, relations, two_day_sh
+
+# === Nueva función para crear página de SH 2 day ===
+def create_2day_shipping_page(two_day_sh_list):
+    """Crea una página con la lista de SH con método 2 day"""
+    if not two_day_sh_list:
+        return None
+    
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    y = 72
+    
+    # Título
+    page.insert_text((72, y), "ÓRDENES CON SHIPPING METHOD: 2 DAY", 
+                    fontsize=16, color=(0, 0, 1), fontname="helv")
+    y += 30
+    
+    # Lista de SH
+    for sh in sorted(two_day_sh_list):
+        if y > 750:
+            page = doc.new_page(width=595, height=842)
+            y = 72
+        page.insert_text((72, y), sh, fontsize=12)
+        y += 20
+    
+    page.insert_text((72, y + 20), f"Total de órdenes 2 day: {len(two_day_sh_list)}", 
+                     fontsize=14, color=(0, 0, 1))
+    
+    return doc
 
 def create_summary_page(order_data, build_keys, shipment_keys, pickup_flag):
     all_orders = set(build_keys) | set(shipment_keys)
@@ -217,9 +258,27 @@ def create_part_numbers_summary(order_data):
     return doc
 
 
-def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
+def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, relations, two_day_sh):
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
+
+    # 1. Insertar tabla de relaciones
+    relations_table = create_relations_table(relations)
+    if relations_table:
+        doc.insert_pdf(relations_table)
+        insert_divider_page(doc, "Resumen de Partes")
+    
+    # 2. Insertar página de SH 2 day
+    two_day_page = create_2day_shipping_page(two_day_sh)
+    if two_day_page:
+        doc.insert_pdf(two_day_page)
+        insert_divider_page(doc, "Documentos Principales")
+    
+    # 3. Insertar resumen de partes
+    part_summary = create_part_numbers_summary(order_meta)
+    if part_summary:
+        doc.insert_pdf(part_summary)
+        insert_divider_page(doc, "Documentos Principales")
 
     # Insertar resumen al inicio
     part_summary = create_part_numbers_summary(order_meta)
@@ -252,32 +311,46 @@ build_file = st.file_uploader("Upload Build Sheets PDF", type="pdf")
 ship_file = st.file_uploader("Upload Shipment Pick Lists PDF", type="pdf")
 pickup_flag = st.checkbox("Summarize Customer Pickup orders", value=True)
 
-if build_file and ship_file and st.button("Generate Merged Output"):
+if build_file and ship_file:
     build_bytes = build_file.read()
     ship_bytes = ship_file.read()
 
-    build_pages = parse_pdf(build_bytes)
-    ship_pages = parse_pdf(ship_bytes)
+    # Procesar ambos PDFs
+    build_pages, build_relations, build_two_day = parse_pdf(build_bytes)
+    ship_pages, ship_relations, ship_two_day = parse_pdf(ship_bytes)
 
+    # Combinar todo
     original_pages = build_pages + ship_pages
+    all_relations = build_relations + ship_relations
+    all_two_day = build_two_day.union(ship_two_day)  # Combinar los sets
     all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
 
-    build_map = group_by_order(build_pages)
-    ship_map = group_by_order(ship_pages)
+    # Mostrar tabla interactiva
+    display_interactive_table(all_relations)
 
-    build_order = get_build_order_list(build_pages)
+    # Mostrar SH con método 2 day en la interfaz
+    if all_two_day:
+        st.subheader("Órdenes con Shipping Method: 2 day")
+        st.write(", ".join(sorted(all_two_day)))
+    else:
+        st.warning("No se encontraron órdenes con Shipping Method: 2 day")
 
-    # Generar resúmenes
-    summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
-    merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag)
+    if st.button("Generate Merged Output"):
+        build_map = group_by_order(build_pages)
+        ship_map = group_by_order(ship_pages)
+        build_order = get_build_order_list(build_pages)
 
-    # Insertar resumen al inicio
-    if summary:
-        merged.insert_pdf(summary, start_at=0)
+        # Generar resúmenes
+        summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
+        merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag, all_relations, all_two_day)
 
-    # Botón de descarga
-    st.download_button(
-        "Download Merged Output PDF",
-        data=merged.tobytes(),
-        file_name="Tequila_Merged_Output.pdf"
-    )
+        # Insertar resumen al inicio
+        if summary:
+            merged.insert_pdf(summary, start_at=0)
+
+        # Botón de descarga
+        st.download_button(
+            "Download Merged Output PDF",
+            data=merged.tobytes(),
+            file_name="Tequila_Merged_Output.pdf"
+        )
