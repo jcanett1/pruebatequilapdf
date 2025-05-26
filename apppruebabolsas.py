@@ -19,48 +19,45 @@ def extract_identifiers(text):
 
 
 def extract_part_numbers(text):
-    """Extrae números de parte con coincidencia EXACTA del texto del PDF"""
+    """Extrae números de parte con coincidencia EXACTA del código + descripción"""
     part_counts = {}
     text_upper = text.upper()
 
-    # Ordenar los códigos por longitud descendente para evitar solapamientos
-    sorted_parts = sorted(PART_DESCRIPTIONS.keys(), key=len, reverse=True)
-
-    for part_num in sorted_parts:
-        escaped = re.escape(part_num)
+    for full_key in PART_DESCRIPTIONS.keys():
+        escaped = re.escape(full_key)
         if re.search(rf'\b{escaped}\b', text_upper):
-            part_counts[part_num] = 1
+            part_counts[full_key] = 1  # Contar solo una vez por página
 
     return part_counts
 
 
 # === Definición correcta de partes (diccionario) ===
 PART_DESCRIPTIONS = {
-    'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
-    'B-PG-082-WHT': '2023 PXG Lightweight Cart Bag - White/Black',
-    'B-PG-172': '2025 Stars & Stripes LW Carry Stand Bag',
-    'B-PG-172-BGRY': 'Xtreme Carry Stand Bag - Black',
-    'B-PG-172-BLACK': 'Xtreme Carry Stand Bag - Freedom - Black',
-    'B-PG-172-DB': 'Deluxe Carry Stand Bag - Black',
-    'B-PG-172-DKNSS': 'Deluxe Carry Stand Bag - Darkness',
-    'B-PG-172-DW': 'Deluxe Carry Stand Bag - White',
-    'B-PG-172-GREEN': 'Xtreme Carry Stand Bag - Freedom - Green',
-    'B-PG-172-GREY': 'Xtreme Carry Stand Bag - Freedom - Grey',
-    'B-PG-172-NAVY': 'Xtreme Carry Stand Bag - Freedom - Navy',
-    'B-PG-172-TAN': 'Xtreme Carry Stand Bag - Freedom - Tan',
-    'B-PG-172-WBLK': 'Xtreme Carry Stand Bag - White',
-    'B-PG-173': '2025 Stars & Stripes Hybrid Stand Bag',
-    'B-PG-173-BGRY': 'Xtreme Hybrid Stand Bag - Black',
-    'B-PG-173-BO': 'Deluxe Hybrid Stand Bag - Black',
-    'B-PG-173-DKNSS': 'Deluxe Hybrid Stand Bag - Darkness',
-    'B-PG-173-WBLK': 'Xtreme Hybrid Stand Bag - White',
-    'B-PG-173-WO': 'Deluxe Hybrid Stand Bag - White',
-    'B-PG-244': 'Xtreme Cart Bag - White',
-    'B-PG-245': '2025 Stars & Stripes Cart Bag',
-    'B-PG-245-BLK': 'Deluxe Cart Bag B2 - Black',
-    'B-PG-245-WHT': 'Deluxe Cart Bag B2 - White',
-    'B-PG-246-POLY': 'Minimalist Carry Stand Bag - Black',
-    'B-UGB8-EP': '2020 Carry Stand Bag - Black'
+    'B-PG-081-BLK - 2023 PXG Deluxe Cart Bag - Black': 'B-PG-081-BLK',
+    'B-PG-082-WHT - 2023 PXG Lightweight Cart Bag - White/Black': 'B-PG-082-WHT',
+    'B-PG-172 - 2025 Stars & Stripes LW Carry Stand Bag': 'B-PG-172',
+    'B-PG-172-BGRY - Xtreme Carry Stand Bag - Black': 'B-PG-172-BGRY',
+    'B-PG-172-BLACK - Xtreme Carry Stand Bag - Freedom - Black': 'B-PG-172-BLACK',
+    'B-PG-172-DB - Deluxe Carry Stand Bag - Black': 'B-PG-172-DB',
+    'B-PG-172-DKNSS - Deluxe Carry Stand Bag - Darkness': 'B-PG-172-DKNSS',
+    'B-PG-172-DW - Deluxe Carry Stand Bag - White': 'B-PG-172-DW',
+    'B-PG-172-GREEN - Xtreme Carry Stand Bag - Freedom - Green': 'B-PG-172-GREEN',
+    'B-PG-172-GREY - Xtreme Carry Stand Bag - Freedom - Grey': 'B-PG-172-GREY',
+    'B-PG-172-NAVY - Xtreme Carry Stand Bag - Freedom - Navy': 'B-PG-172-NAVY',
+    'B-PG-172-TAN - Xtreme Carry Stand Bag - Freedom - Tan': 'B-PG-172-TAN',
+    'B-PG-172-WBLK - Xtreme Carry Stand Bag - White': 'B-PG-172-WBLK',
+    'B-PG-173 - 2025 Stars & Stripes Hybrid Stand Bag': 'B-PG-173',
+    'B-PG-173-BGRY - Xtreme Hybrid Stand Bag - Black': 'B-PG-173-BGRY',
+    'B-PG-173-BO - Deluxe Hybrid Stand Bag - Black': 'B-PG-173-BO',
+    'B-PG-173-DKNSS - Deluxe Hybrid Stand Bag - Darkness': 'B-PG-173-DKNSS',
+    'B-PG-173-WBLK - Xtreme Hybrid Stand Bag - White': 'B-PG-173-WBLK',
+    'B-PG-173-WO - Deluxe Hybrid Stand Bag - White': 'B-PG-173-WO',
+    'B-PG-244 - Xtreme Cart Bag - White': 'B-PG-244',
+    'B-PG-245 - 2025 Stars & Stripes Cart Bag': 'B-PG-245',
+    'B-PG-245-BLK - Deluxe Cart Bag B2 - Black': 'B-PG-245-BLK',
+    'B-PG-245-WHT - Deluxe Cart Bag B2 - White': 'B-PG-245-WHT',
+    'B-PG-246-POLY - Minimalist Carry Stand Bag - Black': 'B-PG-246-POLY',
+    'B-UGB8-EP - 2020 Carry Stand Bag - Black': 'B-UGB8-EP'
 }
 
 
@@ -171,9 +168,8 @@ def create_part_numbers_summary(order_data):
     part_appearances = defaultdict(int)
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
-        for part_num, count in part_numbers.items():
-            if part_num in PART_DESCRIPTIONS:
-                part_appearances[part_num] += count
+        for full_key, count in part_numbers.items():
+            part_appearances[full_key] += count
 
     if not part_appearances:
         return None
@@ -182,66 +178,51 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    # === Sección 1: Códigos individuales ===
-    page.insert_text((50, y), "CÓDIGOS DETALLADOS", fontsize=14, fontname="helv", color=(0, 0, 1))
-    y += 20
+    headers = ["Código + Descripción", "Apariciones"]
+    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
+    page.insert_text((500, y), headers[1], fontsize=12, fontname="helv")
+    y += 25
 
-    for part_num in sorted(part_appearances.keys()):
-        count = part_appearances[part_num]
+    avg_char_width = 6  # Aproximación del ancho promedio de caracteres
+
+    for full_key in sorted(part_appearances.keys()):
+        count = part_appearances[full_key]
         if count == 0:
             continue
         if y > 750:
             page = doc.new_page(width=595, height=842)
             y = 72
 
-        desc = PART_DESCRIPTIONS[part_num]
-        line = f"{part_num} - {desc} → {count}"
+        lines = []
+        temp = full_key
+        while len(temp) > 60:
+            chunk = temp[:60]
+            lines.append(chunk)
+            temp = temp[60:]
+        lines.append(temp)
 
-        # Si la línea es muy larga, dividimos en varias
-        while len(line) > 70:
-            chunk = line[:70]
-            page.insert_text((50, y), chunk, fontsize=10)
-            line = line[70:]
+        for line in lines:
+            page.insert_text((50, y), line, fontsize=10)
             y += 12
-        page.insert_text((50, y), line, fontsize=10)
-        y += 16
 
-    # === Sección 2: Agrupados por prefijo ===
+        y -= 12
+        count_str = str(count)
+        text_width = len(count_str) * avg_char_width
+        x_count = 540 - text_width
+        page.insert_text((x_count, y), count_str, fontsize=10)
+        y += 12
+
+    total = sum(part_appearances.values())
     y += 20
     if y > 750:
         page = doc.new_page(width=595, height=842)
         y = 72
 
-    page.insert_text((50, y), "TOTAL POR PREFIJO", fontsize=14, fontname="helv", color=(0, 0, 1))
-    y += 20
-
-    grouped_by_prefix = defaultdict(int)
-
-    for part_num, count in part_appearances.items():
-        prefix = '-'.join(part_num.split('-')[:3])  # Por ejemplo: B-PG-172
-        grouped_by_prefix[prefix] += count
-
-    for prefix in sorted(grouped_by_prefix.keys()):
-        total = grouped_by_prefix[prefix]
-        if y > 750:
-            page = doc.new_page(width=595, height=842)
-            y = 72
-        line = f"{prefix} → Total: {total}"
-        page.insert_text((50, y), line, fontsize=12)
-        y += 16
-
-    # === Sección 3: Total general ===
-    y += 20
-    if y > 750:
-        page = doc.new_page(width=595, height=842)
-        y = 72
-
-    total_general = sum(part_appearances.values())
     page.insert_text(
         (50, y),
-        f"TOTAL GENERAL DE APARICIONES: {total_general}",
+        f"TOTAL GENERAL DE APARICIONES: {total}",
         fontsize=14,
-        color=(1, 0, 0),
+        color=(0, 0, 1),
         fontname="helv"
     )
 
