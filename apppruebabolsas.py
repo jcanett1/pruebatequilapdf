@@ -183,34 +183,126 @@ def parse_pdf(file_bytes):
 
     return pages, relations, two_day_sh
 
+def group_codes_by_family(relations):
+    """Agrupa los códigos por familia principal"""
+    # Convertir a DataFrame
+    df = pd.DataFrame(relations)
+    
+    # Extraer familia base (ej: B-PG-172 de B-PG-172-BGRY)
+    df['Familia'] = df['Código'].apply(lambda x: x.split('-')[0] + '-' + x.split('-')[1] + '-' + x.split('-')[2])
+    
+    # Ordenar por Familia y luego por Código
+    df = df.sort_values(by=['Familia', 'Código'])
+    
+    return df
+
+
 def display_interactive_table(relations):
-    """Muestra una tabla interactiva con las relaciones"""
+    """Muestra una tabla interactiva con códigos agrupados por familia"""
     if not relations:
         st.warning("No se encontraron relaciones entre órdenes, códigos y SH")
         return
     
-    df = pd.DataFrame(relations)
-    df = df.sort_values(by=["Orden", "Código"])
+    # Agrupar por familia
+    df = group_codes_by_family(relations)
     
-    st.subheader("Relación Detallada de Órdenes, Códigos y SH")
+    # Formatear códigos para mostrar jerarquía
+    def format_code(row):
+        base_family = row['Familia']
+        full_code = row['Código']
+        if full_code == base_family:
+            return full_code
+        else:
+            return "└─ " + full_code.replace(base_family + '-', '')
+    
+    df['Código (Agrupado)'] = df.apply(format_code, axis=1)
+    
+    st.subheader("Relación Detallada de Órdenes, Códigos y SH (Agrupados por Familia)")
+    
+    # Mostrar solo columnas relevantes
+    display_df = df[['Orden', 'Código (Agrupado)', 'Descripción', 'SH']]
     
     st.dataframe(
-        df,
+        display_df,
         column_config={
             "Descripción": st.column_config.TextColumn(width="large"),
-            "SH": st.column_config.TextColumn(width="medium")
+            "SH": st.column_config.TextColumn(width="medium"),
+            "Código (Agrupado)": st.column_config.TextColumn(width="medium", 
+                                                          help="Códigos agrupados por familia")
         },
         hide_index=True,
         use_container_width=True
     )
     
-    csv = df.to_csv(index=False, encoding='utf-8')
+    # Opción para descargar
+    csv = df[['Orden', 'Código', 'Descripción', 'SH']].to_csv(index=False, encoding='utf-8')
     st.download_button(
         "Descargar como CSV",
         data=csv,
         file_name='relacion_ordenes_codigos_sh.csv',
         mime='text/csv'
     )
+
+
+def create_relations_table(relations):
+    """Crea una tabla PDF con códigos agrupados por familia"""
+    if not relations:
+        return None
+    
+    # Agrupar por familia
+    df = group_codes_by_family(relations)
+    
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    y = 50
+    
+    # Título
+    title = "RELACIÓN ÓRDENES - CÓDIGOS (AGRUPADOS) - SH"
+    page.insert_text((50, y), title, fontsize=16, color=(0, 0, 1), fontname="helv")
+    y += 30
+    
+    # Encabezados
+    headers = ["Orden", "Código", "Descripción", "SH"]
+    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
+    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
+    page.insert_text((300, y), headers[2], fontsize=12, fontname="helv")
+    page.insert_text((500, y), headers[3], fontsize=12, fontname="helv")
+    y += 20
+    
+    current_family = None
+    
+    for _, row in df.iterrows():
+        if y > 750:
+            page = doc.new_page(width=595, height=842)
+            y = 50
+            # Reinsertar encabezados en nueva página
+            page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
+            page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
+            page.insert_text((300, y), headers[2], fontsize=12, fontname="helv")
+            page.insert_text((500, y), headers[3], fontsize=12, fontname="helv")
+            y += 20
+            
+        family = row['Familia']
+        code = row['Código']
+        
+        # Mostrar familia principal si cambió
+        if family != current_family:
+            page.insert_text((50, y), row['Orden'], fontsize=10)
+            page.insert_text((150, y), family, fontsize=10, fontname="helv-b")
+            page.insert_text((300, y), PART_DESCRIPTIONS.get(family, ""), fontsize=10)
+            page.insert_text((500, y), row['SH'], fontsize=10)
+            y += 15
+            current_family = family
+        
+        # Mostrar variante si es diferente a la familia base
+        if code != family:
+            page.insert_text((50, y), "", fontsize=10)  # Dejar orden en blanco
+            page.insert_text((150, y), "  " + code.replace(family + '-', ''), fontsize=10)
+            page.insert_text((300, y), PART_DESCRIPTIONS.get(code, ""), fontsize=10)
+            page.insert_text((500, y), row['SH'], fontsize=10)
+            y += 15
+    
+    return doc
 
 # === Nueva función para crear página de SH 2 day ===
 def create_2day_shipping_page(two_day_sh_list):
