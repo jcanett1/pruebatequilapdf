@@ -166,10 +166,14 @@ def group_by_order(pages, classify_pickup=False):
 
 def create_part_numbers_summary(order_data):
     part_appearances = defaultdict(int)
+
+    # Contar apariciones completas (código + descripción)
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
-        for full_key, count in part_numbers.items():
-            part_appearances[full_key] += count
+        for part_num, count in part_numbers.items():
+            if part_num in PART_DESCRIPTIONS:
+                full_key = f"{part_num} - {PART_DESCRIPTIONS[part_num]}"
+                part_appearances[full_key] += count
 
     if not part_appearances:
         return None
@@ -178,6 +182,7 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
+    # Encabezados
     headers = ["Código + Descripción", "Apariciones"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
     page.insert_text((500, y), headers[1], fontsize=12, fontname="helv")
@@ -194,11 +199,12 @@ def create_part_numbers_summary(order_data):
             y = 72
 
         lines = []
-        while len(full_key) > 60:
-            chunk = full_key[:60]
+        temp = full_key
+        while len(temp) > 60:
+            chunk = temp[:60]
             lines.append(chunk)
-            full_key = full_key[60:]
-        lines.append(full_key)
+            temp = temp[60:]
+        lines.append(temp)
 
         for line in lines:
             page.insert_text((50, y), line, fontsize=10)
