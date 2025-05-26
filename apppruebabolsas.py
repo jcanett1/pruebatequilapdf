@@ -168,9 +168,7 @@ def create_part_numbers_summary(order_data):
         part_numbers = data.get("part_numbers", {})
         for part_num, count in part_numbers.items():
             if part_num in PART_DESCRIPTIONS:
-                # Usamos el código + descripción como clave única
-                full_key = f"{part_num} - {PART_DESCRIPTIONS[part_num]}"
-                part_appearances[full_key] += count  # Sumamos apariciones por clave completa
+                part_appearances[part_num] += count
 
     if not part_appearances:
         return None
@@ -179,41 +177,43 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    headers = ["Código + Descripción", "Apariciones"]
+    # Encabezados
+    headers = ["Código", "Descripción", "Apariciones"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
-    page.insert_text((500, y), headers[1], fontsize=12, fontname="helv", align=3)
+    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
+
+    # Alineamos "Apariciones" a la derecha manualmente
+    avg_char_width = 6  # ajuste aproximado para tamaño de fuente 12
+    header2_width = len(headers[2]) * avg_char_width
+    x_header2 = 540 - header2_width
+    page.insert_text((x_header2, y), headers[2], fontsize=12, fontname="helv")
     y += 25
 
-    avg_char_width = 6  # Aproximación para alinear números
-
-    for full_key in sorted(part_appearances.keys()):
-        count = part_appearances[full_key]
+    for part_num in sorted(part_appearances.keys()):
+        count = part_appearances[part_num]
         if count == 0:
             continue
         if y > 750:
             page = doc.new_page(width=595, height=842)
             y = 72
 
-        # Dividir en líneas si es muy larga
-        lines = []
-        while len(full_key) > 60:
-            chunk = full_key[:60]
-            lines.append(chunk)
-            full_key = full_key[60:]
-        lines.append(full_key)
+        desc = PART_DESCRIPTIONS[part_num]
 
-        # Insertar texto línea por línea
-        for line in lines:
-            page.insert_text((50, y), line, fontsize=10)
-            y += 12
+        # Insertar código y descripción
+        page.insert_text((50, y), part_num, fontsize=10)
+        if len(desc) > 40:
+            page.insert_text((150, y), desc[:40], fontsize=9)
+            page.insert_text((150, y + 12), desc[40:], fontsize=9)
+        else:
+            page.insert_text((150, y), desc, fontsize=10)
 
-        # Retroceder una línea para insertar número
-        y -= 12
+        # Alinear apariciones a la derecha
         count_str = str(count)
         text_width = len(count_str) * avg_char_width
         x_count = 540 - text_width
         page.insert_text((x_count, y), count_str, fontsize=10)
-        y += 12
+
+        y += 25 if len(desc) > 40 else 15
 
     total = sum(part_appearances.values())
     y += 20
