@@ -30,7 +30,6 @@ def extract_part_numbers(text):
 
     return part_counts
 
-
 # === Definición correcta de partes (diccionario) ===
 PART_DESCRIPTIONS = {
     'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
