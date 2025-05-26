@@ -77,6 +77,55 @@ PART_DESCRIPTIONS = {
 }
 
 
+def create_relations_table(relations):
+    """Crea una tabla PDF con las relaciones orden-código-SH"""
+    if not relations:
+        return None
+    
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    y = 50
+    
+    # Título
+    page.insert_text((50, y), "RELACIÓN ÓRDENES - CÓDIGOS - SH", 
+                    fontsize=16, color=(0, 0, 1), fontname="helv")
+    y += 30
+    
+    # Encabezados
+    headers = ["Orden", "Código", "Descripción", "SH"]
+    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
+    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
+    page.insert_text((300, y), headers[2], fontsize=12, fontname="helv")
+    page.insert_text((500, y), headers[3], fontsize=12, fontname="helv")
+    y += 20
+    
+    # Convertir a DataFrame para ordenar
+    df = pd.DataFrame(relations)
+    df = df.sort_values(by=["Orden", "Código"])
+    
+    # Datos
+    for _, row in df.iterrows():
+        if y > 750:
+            page = doc.new_page(width=595, height=842)
+            y = 50
+            
+        page.insert_text((50, y), row["Orden"], fontsize=10)
+        page.insert_text((150, y), row["Código"], fontsize=10)
+        
+        # Descripción en múltiples líneas si es necesario
+        desc = row["Descripción"]
+        if len(desc) > 30:
+            page.insert_text((300, y), desc[:30], fontsize=9)
+            page.insert_text((300, y + 12), desc[30:], fontsize=9)
+            y += 12
+        else:
+            page.insert_text((300, y), desc, fontsize=10)
+            
+        page.insert_text((500, y), row["SH"], fontsize=10)
+        y += 25 if len(desc) > 30 else 15
+    
+    return doc
+
 def insert_divider_page(doc, label):
     """Crea una página divisoria con texto de etiqueta"""
     page = doc.new_page()
