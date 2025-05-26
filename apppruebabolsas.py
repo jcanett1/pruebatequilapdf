@@ -166,14 +166,13 @@ def group_by_order(pages, classify_pickup=False):
 
 def create_part_numbers_summary(order_data):
     part_appearances = defaultdict(int)
-
-    # Contar apariciones completas (código + descripción)
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
         for part_num, count in part_numbers.items():
             if part_num in PART_DESCRIPTIONS:
+                # Usamos el código + descripción como clave única
                 full_key = f"{part_num} - {PART_DESCRIPTIONS[part_num]}"
-                part_appearances[full_key] += count
+                part_appearances[full_key] += count  # Sumamos apariciones por clave completa
 
     if not part_appearances:
         return None
@@ -182,10 +181,9 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    # Encabezados
     headers = ["Código + Descripción", "Apariciones"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
-    page.insert_text((500, y), headers[1], fontsize=12, fontname="helv")
+    page.insert_text((500, y), headers[1], fontsize=12, fontname="helv", align=3)
     y += 25
 
     avg_char_width = 6  # Aproximación para alinear números
@@ -198,18 +196,20 @@ def create_part_numbers_summary(order_data):
             page = doc.new_page(width=595, height=842)
             y = 72
 
+        # Dividir en líneas si es muy larga
         lines = []
-        temp = full_key
-        while len(temp) > 60:
-            chunk = temp[:60]
+        while len(full_key) > 60:
+            chunk = full_key[:60]
             lines.append(chunk)
-            temp = temp[60:]
-        lines.append(temp)
+            full_key = full_key[60:]
+        lines.append(full_key)
 
+        # Insertar texto línea por línea
         for line in lines:
             page.insert_text((50, y), line, fontsize=10)
             y += 12
 
+        # Retroceder una línea para insertar número
         y -= 12
         count_str = str(count)
         text_width = len(count_str) * avg_char_width
