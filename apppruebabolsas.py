@@ -151,19 +151,27 @@ def get_build_order_list(build_pages):
 
 
 def group_by_order(pages, classify_pickup=False):
-    order_map = defaultdict(lambda: {"pages": [], "pickup": False, "part_numbers": defaultdict(int)})
+    # Asegúrate de que pages sea una lista de diccionarios
+    if not isinstance(pages, list):
+        raise ValueError("pages debe ser una lista de diccionarios")
+
     for page in pages:
-        oid = page.get("order_id")  # Usa .get() para evitar KeyError
-        if not oid:
-            continue
-        order_map[oid]["pages"].append(page)
-        if classify_pickup:
-            text = page.get("text", "")
-            if PICKUP_REGEX.search(text):
-                order_map[oid]["pickup"] = True
-        for part_num, qty in page.get("part_numbers", {}).items():
-            order_map[oid]["part_numbers"][part_num] += qty
-    return order_map
+        # Verifica que page sea un diccionario
+        if not isinstance(page, dict):
+            raise ValueError("Cada página debe ser un diccionario")
+
+        # Obtén part_numbers con un valor predeterminado de diccionario vacío
+        part_numbers = page.get("part_numbers", {})
+
+        # Verifica que part_numbers sea un diccionario
+        if not isinstance(part_numbers, dict):
+            raise ValueError("part_numbers debe ser un diccionario")
+
+        # Itera sobre los elementos de part_numbers
+        for part_num, qty in part_numbers.items():
+            # Tu lógica aquí
+            pass
+
 
 
 from collections import defaultdict
