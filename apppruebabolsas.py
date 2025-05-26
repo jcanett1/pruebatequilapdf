@@ -19,15 +19,20 @@ def extract_identifiers(text):
 
 
 def extract_part_numbers(text):
-    """Extrae números de parte con coincidencia exacta y sin duplicados por página"""
-    part_counts = {}
+    """Extrae números de parte con coincidencia EXACTA del código + descripción"""
+    part_sh_numbers = defaultdict(list)
     text_upper = text.upper()
-    for part_num in PART_DESCRIPTIONS.keys():
-        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
-        if re.search(pattern, text_upper):
-            part_counts[part_num] = 1  # Contar solo 1 vez por página
-    return part_counts
 
+    for full_key in PART_DESCRIPTIONS.keys():
+        escaped = re.escape(full_key)
+        if re.search(rf'\b{escaped}\b', text_upper):
+            # Aquí debes extraer el número de SH del texto
+            # Asumiendo que el texto contiene el número de SH en algún formato
+            sh_number = re.search(r'SH\d+', text)
+            if sh_number:
+                part_sh_numbers[full_key].append(sh_number.group())
+
+    return part_sh_numbers
 
 # === Definición correcta de partes (diccionario) ===
 PART_DESCRIPTIONS = {
@@ -163,56 +168,62 @@ def group_by_order(pages, classify_pickup=False):
 
 
 def create_part_numbers_summary(order_data):
-    part_appearances = defaultdict(int)
+    part_sh_numbers = defaultdict(list)
 
+    # Asociar cada código de parte con una lista de números de SH
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
-        for part_num, count in part_numbers.items():
+        for part_num, sh_list in part_numbers.items():
             if part_num in PART_DESCRIPTIONS:
-                part_appearances[part_num] += count
+                part_sh_numbers[part_num].extend(sh_list)
 
-    if not part_appearances:
+    if not part_sh_numbers:
         return None
 
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    headers = ["Código", "Descripción", "Apariciones"]
-    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv", set_simple=True)
-    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv", set_simple=True)
-    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv", set_simple=True)
+    # Encabezados
+    headers = ["Código + Descripción", "Números de SH"]
+    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
+    page.insert_text((500, y), headers[1], fontsize=12, fontname="helv")
     y += 25
 
-    for part_num in sorted(part_appearances.keys()):
-        count = part_appearances[part_num]
-        if count == 0:
+    avg_char_width = 6  # Aproximación del ancho promedio de caracteres
+
+    # Mostrar cada código + descripción y sus números de SH
+    for part_num in sorted(part_sh_numbers.keys()):
+        sh_list = part_sh_numbers[part_num]
+        if not sh_list:
             continue
         if y > 750:
             page = doc.new_page(width=595, height=842)
             y = 72
 
         desc = PART_DESCRIPTIONS[part_num]
-        page.insert_text((50, y), part_num, fontsize=10)
+        full_line = f"{part_num} - {desc}"
 
-        if len(desc) > 40:
-            page.insert_text((150, y), desc[:40], fontsize=9)
-            page.insert_text((150, y + 12), desc[40:], fontsize=9)
-        else:
-            page.insert_text((150, y), desc, fontsize=10)
+        # Si es muy largo, dividimos en varias líneas
+        lines = []
+        temp = full_line
+        while len(temp) > 60:
+            chunk = temp[:60]
+            lines.append(chunk)
+            temp = temp[60:]
+        lines.append(temp)
 
-        page.insert_text((450, y), str(count), fontsize=10)
-        y += 25 if len(desc) > 40 else 15
+        for line in lines:
+            page.insert_text((50, y), line, fontsize=10)
+            y += 12
 
-    total = sum(part_appearances.values())
-    page.insert_text(
-        (50, y + 20),
-        f"TOTAL GENERAL DE APARICIONES: {total}",
-        fontsize=14,
-        color=(0, 0, 1),
-        fontname="helv",
-        set_simple=True
-    )
+        # Retroceder una línea para insertar números de SH
+        y -= 12
+        sh_str = ", ".join(sh_list)
+        text_width = len(sh_str) * avg_char_width
+        x_sh = 540 - text_width  # Alineado a la derecha
+        page.insert_text((x_sh, y), sh_str, fontsize=10)
+        y += 12
 
     return doc
 
