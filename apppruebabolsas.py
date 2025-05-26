@@ -23,17 +23,17 @@ def extract_part_numbers(text):
     part_sh_numbers = defaultdict(list)
     text_upper = text.upper()
 
+    # Extraer número de shipment (ej: SH12345)
+    sh_match = re.search(r'SH\d+', text_upper)
+    sh_number = sh_match.group() if sh_match else "Unknown"
+
+    # Buscar cada parte por su clave completa (código - descripción)
     for full_key in PART_DESCRIPTIONS.keys():
         escaped = re.escape(full_key)
         if re.search(rf'\b{escaped}\b', text_upper):
-            # Aquí debes extraer el número de SH del texto
-            # Asumiendo que el texto contiene el número de SH en algún formato
-            sh_number = re.search(r'SH\d+', text)
-            if sh_number:
-                part_sh_numbers[full_key].append(sh_number.group())
+            part_sh_numbers[full_key].append(sh_number)
 
     return part_sh_numbers
-
 # === Definición correcta de partes (diccionario) ===
 PART_DESCRIPTIONS = {
     'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
@@ -152,9 +152,9 @@ def get_build_order_list(build_pages):
 
 
 def group_by_order(pages, classify_pickup=False):
-    order_map = defaultdict(lambda: {"pages": [], "pickup": False, "part_numbers": defaultdict(int)})
+    order_map = defaultdict(lambda: {"pages": [], "pickup": False, "part_numbers": defaultdict(list)})
     for page in pages:
-        oid = page.get("order_id")  # Usa .get() para evitar KeyError
+        oid = page.get("order_id")
         if not oid:
             continue
         order_map[oid]["pages"].append(page)
@@ -162,15 +162,15 @@ def group_by_order(pages, classify_pickup=False):
             text = page.get("text", "")
             if PICKUP_REGEX.search(text):
                 order_map[oid]["pickup"] = True
-        for part_num, qty in page.get("part_numbers", {}).items():
-            order_map[oid]["part_numbers"][part_num] += qty
+        part_numbers = page.get("part_numbers", {})
+        for part_num, sh_list in part_numbers.items():
+            order_map[oid]["part_numbers"][part_num].extend(sh_list)
     return order_map
-
 
 def create_part_numbers_summary(order_data):
     part_sh_numbers = defaultdict(list)
 
-    # Asociar cada código de parte con una lista de números de SH
+    # Agregar todas las SH donde aparece cada código
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
         for part_num, sh_list in part_numbers.items():
@@ -184,7 +184,6 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    # Encabezados
     headers = ["Código + Descripción", "Números de SH"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
     page.insert_text((500, y), headers[1], fontsize=12, fontname="helv")
@@ -192,7 +191,6 @@ def create_part_numbers_summary(order_data):
 
     avg_char_width = 6  # Aproximación del ancho promedio de caracteres
 
-    # Mostrar cada código + descripción y sus números de SH
     for part_num in sorted(part_sh_numbers.keys()):
         sh_list = part_sh_numbers[part_num]
         if not sh_list:
@@ -204,7 +202,6 @@ def create_part_numbers_summary(order_data):
         desc = PART_DESCRIPTIONS[part_num]
         full_line = f"{part_num} - {desc}"
 
-        # Si es muy largo, dividimos en varias líneas
         lines = []
         temp = full_line
         while len(temp) > 60:
@@ -217,11 +214,10 @@ def create_part_numbers_summary(order_data):
             page.insert_text((50, y), line, fontsize=10)
             y += 12
 
-        # Retroceder una línea para insertar números de SH
         y -= 12
-        sh_str = ", ".join(sh_list)
+        sh_str = ", ".join(set(sh_list))  # Eliminar duplicados
         text_width = len(sh_str) * avg_char_width
-        x_sh = 540 - text_width  # Alineado a la derecha
+        x_sh = 540 - text_width
         page.insert_text((x_sh, y), sh_str, fontsize=10)
         y += 12
 
