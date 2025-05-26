@@ -373,20 +373,29 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, r
         doc.insert_pdf(part_summary)
         insert_divider_page(doc, "Documentos Principales")
 
-    if pickup_flag and pickups:
-        insert_divider_page(doc, "Customer Pickup Orders")
-        for oid in pickups:
+    # Insertar páginas de órdenes
+    def insert_order_pages(order_list):
+        for oid in order_list:
+            # Insertar build pages
             for p in build_map.get(oid, {}).get("pages", []):
+                src_page = p["parent"][p["number"]]
                 doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
+            
+            # Insertar ship pages
             for p in ship_map.get(oid, {}).get("pages", []):
+                src_page = p["parent"][p["number"]]
                 doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
 
+    # Insertar pickups primero si está habilitado
+    if pickup_flag and pickups:
+        insert_divider_page(doc, "Customer Pickup Orders")
+        insert_order_pages(pickups)
+
+    # Insertar otras órdenes
     others = [oid for oid in build_order if oid not in pickups]
-    for oid in others:
-        for p in build_map.get(oid, {}).get("pages", []):
-            doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
-        for p in ship_map.get(oid, {}).get("pages", []):
-            doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
+    if others:
+        insert_divider_page(doc, "Other Orders")
+        insert_order_pages(others)
 
     return doc
 
