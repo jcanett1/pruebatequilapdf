@@ -48,35 +48,36 @@ def extract_part_numbers(text):
     return part_sh_numbers
 # === Definición correcta de partes (diccionario) ===
 PART_DESCRIPTIONS = {
-    "2023 PXG Deluxe Cart Bag - Black": "B-PG-081-BLK",
-    "2023 PXG Lightweight Cart Bag - White/Black": "B-PG-082-WHT",
-    "2025 Stars & Stripes LW Carry Stand Bag": "B-PG-172",
-    "Xtreme Carry Stand Bag - Black": "B-PG-172-BGRY",
-    "Xtreme Carry Stand Bag - Freedom - Black": "B-PG-172-BLACK",
-    "Deluxe Carry Stand Bag - Black": "B-PG-172-DB",
-    "Deluxe Carry Stand Bag - Darkness": "B-PG-172-DKNSS",
-    "Deluxe Carry Stand Bag - White": "B-PG-172-DW",
-    "Xtreme Carry Stand Bag - Freedom - Green": "B-PG-172-GREEN",
-    "Xtreme Carry Stand Bag - Freedom - Grey": "B-PG-172-GREY",
-    "Xtreme Carry Stand Bag - Freedom - Navy": "B-PG-172-NAVY",
-    "Xtreme Carry Stand Bag - Freedom - Tan": "B-PG-172-TAN",
-    "Xtreme Carry Stand Bag - White": "B-PG-172-WBLK",
-    "2025 Stars & Stripes Hybrid Stand Bag": "B-PG-173",
-    "Xtreme Hybrid Stand Bag - Black": "B-PG-173-BGRY",
-    "Deluxe Hybrid Stand Bag - Black": "B-PG-173-BO",
-    "Deluxe Hybrid Stand Bag - Darkness": "B-PG-173-DKNSS",
-    "Xtreme Hybrid Stand Bag - White": "B-PG-173-WBLK",
-    "Deluxe Hybrid Stand Bag - White": "B-PG-173-WO",
-    "Xtreme Cart Bag - White": "B-PG-244",
-    "2025 Stars & Stripes Cart Bag": "B-PG-245",
-    "Deluxe Cart Bag B2 - Black": "B-PG-245-BLK",
-    "Deluxe Cart Bag B2 - White": "B-PG-245-WHT",
-    "Minimalist Carry Stand Bag - Black": "B-PG-246-POLY",
-    "2020 Carry Stand Bag - Black": "B-UGB8-EP"
+    'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
+    'B-PG-082-WHT': '2023 PXG Lightweight Cart Bag - White/Black',
+    'B-PG-172': '2025 Stars & Stripes LW Carry Stand Bag',
+    'B-PG-172-BGRY': 'Xtreme Carry Stand Bag - Black',
+    'B-PG-172-BLACK': 'Xtreme Carry Stand Bag - Freedom - Black',
+    'B-PG-172-DB': 'Deluxe Carry Stand Bag - Black',
+    'B-PG-172-DKNSS': 'Deluxe Carry Stand Bag - Darkness',
+    'B-PG-172-DW': 'Deluxe Carry Stand Bag - White',
+    'B-PG-172-GREEN': 'Xtreme Carry Stand Bag - Freedom - Green',
+    'B-PG-172-GREY': 'Xtreme Carry Stand Bag - Freedom - Grey',
+    'B-PG-172-NAVY': 'Xtreme Carry Stand Bag - Freedom - Navy',
+    'B-PG-172-TAN': 'Xtreme Carry Stand Bag - Freedom - Tan',
+    'B-PG-172-WBLK': 'Xtreme Carry Stand Bag - White',
+    'B-PG-173': '2025 Stars & Stripes Hybrid Stand Bag',
+    'B-PG-173-BGRY': 'Xtreme Hybrid Stand Bag - Black',
+    'B-PG-173-BO': 'Deluxe Hybrid Stand Bag - Black',
+    'B-PG-173-DKNSS': 'Deluxe Hybrid Stand Bag - Darkness',
+    'B-PG-173-WBLK': 'Xtreme Hybrid Stand Bag - White',
+    'B-PG-173-WO': 'Deluxe Hybrid Stand Bag - White',
+    'B-PG-244': 'Xtreme Cart Bag - White',
+    'B-PG-245': '2025 Stars & Stripes Cart Bag',
+    'B-PG-245-BLK': 'Deluxe Cart Bag B2 - Black',
+    'B-PG-245-WHT': 'Deluxe Cart Bag B2 - White',
+    'B-PG-246-POLY': 'Minimalist Carry Stand Bag - Black',
+    'B-UGB8-EP': '2020 Carry Stand Bag - Black'
 }
 
+# Opcional: Si también necesitas el inverso (descripción → código)
 DESCRIPTION_TO_CODE = {
-    description: code for code, description in PART_DESCRIPTIONS.items()
+    desc: code for code, desc in PART_DESCRIPTIONS.items()
 }
 
 def insert_divider_page(doc, label):
