@@ -180,32 +180,32 @@ def group_by_order(pages, classify_pickup=False):
     return order_map
 
 def create_part_numbers_summary(order_data):
-    part_appearances = defaultdict(list)  # Ahora guardamos lista de SH por código
+    part_sh_numbers = defaultdict(list)
 
     # Recolección de todos los SH asociados a cada código
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
-        for part_num, count in part_numbers.items():
+        for part_num, sh_list in part_numbers.items():
             if part_num in PART_DESCRIPTIONS:
-                # Suponemos que el texto tiene el número de SH (puede mejorarse aquí si está disponible en otro campo)
-                part_appearances[part_num].append(oid)
+                part_sh_numbers[part_num].extend(sh_list)
 
-    if not part_appearances:
+    if not part_sh_numbers:
         return None
 
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     y = 72
 
-    # Encabezado principal
-    page.insert_text((50, y), "CÓDIGOS Y ORDENES DE APARICIÓN", fontsize=16, fontname="helv", color=(0, 0, 1))
+    headers = ["Código + Descripción", "Números de SH"]
+    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
+    page.insert_text((450, y), headers[1], fontsize=12, fontname="helv")
     y += 25
 
     avg_char_width = 5.5  # Aproximación del ancho promedio de caracteres
 
-    for part_num in sorted(part_appearances.keys()):
-        sh_list = part_appearances[part_num]
-        unique_sh = list(set(sh_list))  # Elimina duplicados
+    for part_num in sorted(part_sh_numbers.keys()):
+        sh_list = part_sh_numbers[part_num]
+        unique_sh = list(set(sh_list))
         if not unique_sh:
             continue
         if y > 750:
@@ -215,7 +215,6 @@ def create_part_numbers_summary(order_data):
         desc = PART_DESCRIPTIONS[part_num]
         full_line = f"{part_num} - {desc}"
 
-        # Mostrar línea del código + descripción
         lines = []
         temp = full_line
         while len(temp) > 60:
@@ -228,19 +227,14 @@ def create_part_numbers_summary(order_data):
             page.insert_text((50, y), line, fontsize=10)
             y += 12
 
-        # Agregar espacio para cuadro de órdenes
-        y += 5
+        y -= 12  # Retrocedemos una línea para insertar los SH a la derecha
         sh_str = ", ".join(unique_sh)
-        
-        # Dibujar cuadro para las órdenes (SHXXXXX)
         text_width = len(sh_str) * avg_char_width
-        rect_width = max(text_width + 20, 300)  # Ancho mínimo para que no se vea muy estrecho
-        rect = fitz.Rect(50, y, 50 + rect_width, y + 20)
-        page.draw_rect(rect, color=(0, 0, 0), width=0.5)
-        page.insert_text((60, y + 14), sh_str, fontsize=9, fontname="cour")
-        y += 30  # Espacio antes del siguiente código
+        x_sh = 540 - text_width
+        page.insert_text((x_sh, y), sh_str, fontsize=10)
+        y += 12
 
-    total = len(part_appearances)
+    total = len(part_sh_numbers)
     y += 20
     if y > 750:
         page = doc.new_page(width=595, height=842)
