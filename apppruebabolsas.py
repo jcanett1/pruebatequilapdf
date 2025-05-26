@@ -19,15 +19,17 @@ def extract_identifiers(text):
 
 
 def extract_part_numbers(text):
-    """Extrae números de parte con coincidencia EXACTA del código completo"""
+    """Extrae números de parte con coincidencia EXACTA del texto del PDF"""
     part_counts = {}
     text_upper = text.upper()
 
-    for part_num in PART_DESCRIPTIONS.keys():
-        # Buscar coincidencia exacta del código rodeado de límites de palabra
+    # Ordenar los códigos por longitud descendente para evitar solapamientos
+    sorted_parts = sorted(PART_DESCRIPTIONS.keys(), key=len, reverse=True)
+
+    for part_num in sorted_parts:
         escaped = re.escape(part_num)
         if re.search(rf'\b{escaped}\b', text_upper):
-            part_counts[part_num] = 1  # Contar solo 1 vez por página
+            part_counts[part_num] = 1
 
     return part_counts
 
