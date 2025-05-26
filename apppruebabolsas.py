@@ -164,8 +164,13 @@ def group_by_order(pages, classify_pickup=False):
     return order_map
 
 
+from collections import defaultdict
+import fitz  # Asegúrate de tener esta importación si no está arriba
+
 def create_part_numbers_summary(order_data):
     part_appearances = defaultdict(int)
+
+    # Contar apariciones por "código + descripción"
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
         for full_key, count in part_numbers.items():
@@ -178,6 +183,7 @@ def create_part_numbers_summary(order_data):
     page = doc.new_page(width=595, height=842)
     y = 72
 
+    # Encabezados
     headers = ["Código + Descripción", "Apariciones"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
     page.insert_text((500, y), headers[1], fontsize=12, fontname="helv")
@@ -185,6 +191,7 @@ def create_part_numbers_summary(order_data):
 
     avg_char_width = 6  # Aproximación del ancho promedio de caracteres
 
+    # Mostrar cada código + descripción
     for full_key in sorted(part_appearances.keys()):
         count = part_appearances[full_key]
         if count == 0:
@@ -193,6 +200,7 @@ def create_part_numbers_summary(order_data):
             page = doc.new_page(width=595, height=842)
             y = 72
 
+        # Dividir en líneas si es muy larga
         lines = []
         temp = full_key
         while len(temp) > 60:
@@ -201,17 +209,20 @@ def create_part_numbers_summary(order_data):
             temp = temp[60:]
         lines.append(temp)
 
+        # Insertar texto línea por línea
         for line in lines:
             page.insert_text((50, y), line, fontsize=10)
             y += 12
 
+        # Retroceder una línea para insertar cantidad alineada
         y -= 12
         count_str = str(count)
         text_width = len(count_str) * avg_char_width
-        x_count = 540 - text_width
+        x_count = 540 - text_width  # Alineado a la derecha
         page.insert_text((x_count, y), count_str, fontsize=10)
         y += 12
 
+    # Total general
     total = sum(part_appearances.values())
     y += 20
     if y > 750:
