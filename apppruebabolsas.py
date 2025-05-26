@@ -217,7 +217,6 @@ def create_part_numbers_summary(order_data):
         desc = PART_DESCRIPTIONS[part_num]
         full_line = f"{part_num} - {desc}"
 
-        # Mostrar línea del código + descripción en negrita simulada (usamos helv pero más grande)
         lines = []
         temp = full_line
         while len(temp) > 60:
@@ -226,8 +225,9 @@ def create_part_numbers_summary(order_data):
             temp = temp[60:]
         lines.append(temp)
 
+        # Mostrar línea del código + descripción en negrita simulada (más grande)
         for line in lines:
-            page.insert_text((50, y), line, fontsize=12, fontname="helv")  # Usamos 'helv' con tamaño mayor
+            page.insert_text((50, y), line, fontsize=12, fontname="helv")
             y += 14
 
         # Agregar espacio antes del cuadro
