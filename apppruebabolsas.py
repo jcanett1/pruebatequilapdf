@@ -1,6 +1,7 @@
 import streamlit as st
 import fitz  # PyMuPDF
 import re
+import pandas as pd
 from collections import defaultdict
 
 # === Expresiones regulares ===
@@ -9,56 +10,7 @@ SHIPMENT_REGEX = re.compile(r'\bSH(\d{5,})\b')
 PICKUP_REGEX = re.compile(r'Customer\s*Pickup|Cust\s*Pickup|CUSTPICKUP', re.IGNORECASE)
 QUANTITY_REGEX = re.compile(r'(\d+)\s*(?:EA|PCS|PC|Each)', re.IGNORECASE)
 
-# === Funciones auxiliares ===
-def extract_identifiers(text):
-    order_match = ORDER_REGEX.search(text)
-    shipment_match = SHIPMENT_REGEX.search(text)
-    order_id = f"{order_match.group(1).rstrip('-')}-{order_match.group(2)}" if order_match else None
-    shipment_id = f"SH{shipment_match.group(1)}" if shipment_match else None
-    return order_id, shipment_id
-
-
-def extract_part_numbers(text):
-    """Extrae números de parte con coincidencias exactas de códigos completos"""
-    part_sh_numbers = defaultdict(list)
-    text_upper = text.upper()
-
-    # Extraer todos los SH presentes en esta página
-    sh_matches = re.findall(r'SH\d{5,}', text_upper)  # Solo SH con al menos 5 dígitos
-    sh_list = list(set(sh_matches)) if sh_matches else ["Unknown"]
-
-    # Patrón para buscar códigos exactos con límites de palabra
-    code_pattern = re.compile(r'\b({})\b'.format('|'.join(
-        [re.escape(code) for code in PART_DESCRIPTIONS.keys()]
-    )), flags=re.IGNORECASE)
-
-    # Encontrar todas las coincidencias exactas de códigos
-    found_codes = code_pattern.findall(text_upper)
-    
-    # Para cada código encontrado, asociar los SH de esta página
-    for code in set(found_codes):  # Eliminar duplicados en la misma página
-        # Normalizar el código (por si hay variaciones de mayúsculas/guiones)
-        normalized_code = normalize_code(code)
-        if normalized_code in PART_DESCRIPTIONS:
-            for sh in sh_list:
-                part_sh_numbers[normalized_code].append(sh)
-
-    return part_sh_numbers
-
-def normalize_code(code):
-    """Normaliza el formato del código (mayúsculas, guiones)"""
-    # Convertir a mayúsculas y estandarizar guiones
-    code = code.upper().replace(' ', '')
-    # Asegurar que los guiones sean consistentes (ej: BPG172 vs B-PG-172)
-    if '-' not in code and len(code) > 5:
-        # Insertar guiones en posiciones estándar (ej: BPG172 -> B-PG-172)
-        parts = []
-        parts.append(code[:1])  # B
-        parts.append(code[1:3])  # PG
-        parts.append(code[3:])  # 172...
-        code = '-'.join(parts)
-    return code
-# === Definición correcta de partes (diccionario) ===
+# === Definición de partes (diccionario) ===
 PART_DESCRIPTIONS = {
     'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
     'B-PG-082-WHT': '2023 PXG Lightweight Cart Bag - White/Black',
@@ -87,10 +39,44 @@ PART_DESCRIPTIONS = {
     'B-UGB8-EP': '2020 Carry Stand Bag - Black'
 }
 
-# Opcional: Si también necesitas el inverso (descripción → código)
-DESCRIPTION_TO_CODE = {
-    desc: code for code, desc in PART_DESCRIPTIONS.items()
-}
+DESCRIPTION_TO_CODE = {desc: code for code, desc in PART_DESCRIPTIONS.items()}
+
+# === Funciones auxiliares ===
+def extract_identifiers(text):
+    order_match = ORDER_REGEX.search(text)
+    shipment_match = SHIPMENT_REGEX.search(text)
+    order_id = f"{order_match.group(1).rstrip('-')}-{order_match.group(2)}" if order_match else None
+    shipment_id = f"SH{shipment_match.group(1)}" if shipment_match else None
+    return order_id, shipment_id
+
+def normalize_code(code):
+    """Normaliza el formato del código (mayúsculas, guiones)"""
+    code = code.upper().replace(' ', '')
+    if '-' not in code and len(code) > 5:
+        parts = []
+        parts.append(code[:1])
+        parts.append(code[1:3])
+        parts.append(code[3:])
+        code = '-'.join(parts)
+    return code
+
+def extract_part_numbers(text):
+    """Extrae números de parte con coincidencias exactas de códigos completos"""
+    part_sh_numbers = defaultdict(list)
+    text_upper = text.upper()
+
+    # Extraer todos los SH presentes en esta página
+    sh_matches = re.findall(r'SH\d{5,}', text_upper)
+    sh_list = list(set(sh_matches)) if sh_matches else ["Unknown"]
+
+    # Buscar cada código exacto en el texto
+    for code in PART_DESCRIPTIONS:
+        code_pattern = re.compile(r'\b' + re.escape(code) + r'\b', re.IGNORECASE)
+        if code_pattern.search(text_upper):
+            for sh in sh_list:
+                part_sh_numbers[code].append(sh)
+    
+    return part_sh_numbers
 
 def insert_divider_page(doc, label):
     """Crea una página divisoria con texto de etiqueta"""
@@ -103,7 +89,6 @@ def insert_divider_page(doc, label):
         fontname="helv",
         color=(0, 0, 0)
     )
-
 
 def parse_pdf(file_bytes):
     doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -129,7 +114,7 @@ def parse_pdf(file_bytes):
 
         pages.append({
             "number": i,
-            "text": text,  # 👈 Muy importante: guardamos el texto
+            "text": text,
             "order_id": order_id,
             "shipment_id": shipment_id,
             "part_numbers": part_numbers,
@@ -167,7 +152,6 @@ def create_summary_page(order_data, build_keys, shipment_keys, pickup_flag):
         y += 14
     return summary_doc
 
-
 def get_build_order_list(build_pages):
     seen = set()
     order = []
@@ -177,7 +161,6 @@ def get_build_order_list(build_pages):
             seen.add(oid)
             order.append(oid)
     return order
-
 
 def group_by_order(pages, classify_pickup=False):
     order_map = defaultdict(lambda: {"pages": [], "pickup": False, "part_numbers": defaultdict(list)})
@@ -195,73 +178,107 @@ def group_by_order(pages, classify_pickup=False):
             order_map[oid]["part_numbers"][part_num].extend(sh_list)
     return order_map
 
-def create_part_numbers_summary(order_data):
-    part_sh_numbers = defaultdict(list)
-
-    # Recolección de todos los SH asociados a cada código
-    for oid, data in order_data.items():
-        part_numbers = data.get("part_numbers", {})
-        for part_num, sh_list in part_numbers.items():
-            # Asegurarnos que el código está normalizado
-            normalized_num = normalize_code(part_num)
-            if normalized_num in PART_DESCRIPTIONS:
-                # Agregar solo si no está ya en la lista
-                for sh in sh_list:
-                    if sh not in part_sh_numbers[normalized_num]:
-                        part_sh_numbers[normalized_num].append(sh)
-
-    if not part_sh_numbers:
+def create_detailed_codes_report(order_data):
+    """Crea un informe detallado con todos los códigos, sus descripciones y SH asociados"""
+    data = []
+    
+    for oid, order_info in order_data.items():
+        for part_num, sh_list in order_info["part_numbers"].items():
+            for sh in sh_list:
+                data.append({
+                    "Orden": oid,
+                    "Código": part_num,
+                    "Descripción": PART_DESCRIPTIONS.get(part_num, "Desconocida"),
+                    "SH": sh
+                })
+    
+    if not data:
         return None
-
+    
+    # Crear documento PDF
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
-    y = 72
-
-    # Encabezado
-    page.insert_text((50, y), "INFORME DE CÓDIGOS Y SH ASOCIADOS", fontsize=14, color=(0, 0, 1))
-    y += 25
-
-    # Ordenar los códigos alfabéticamente
-    sorted_codes = sorted(part_sh_numbers.keys(), key=lambda x: [
-        int(part) if part.isdigit() else part 
-        for part in re.split('([0-9]+)', x)
-    ])
-
-    for part_num in sorted_codes:
-        sh_list = part_sh_numbers[part_num]
-        desc = PART_DESCRIPTIONS.get(part_num, "Descripción no encontrada")
-        
-        if y > 750:  # Si nos quedamos sin espacio
+    y = 50
+    
+    # Título
+    page.insert_text((50, y), "INFORME DETALLADO DE CÓDIGOS Y SH ASOCIADOS", 
+                    fontsize=16, color=(0, 0, 1), fontname="helv")
+    y += 30
+    
+    # Organizar datos por código
+    df = pd.DataFrame(data)
+    grouped = df.groupby(['Código', 'Descripción'])['SH'].apply(list).reset_index()
+    
+    for _, row in grouped.iterrows():
+        if y > 750:
             page = doc.new_page(width=595, height=842)
-            y = 72
-
-        # Mostrar código y descripción
-        page.insert_text((50, y), f"{part_num} - {desc}", fontsize=12, fontname="helv")
-        y += 15
-
-        # Mostrar SH asociados
-        sh_text = ", ".join(sorted(sh_list))
+            y = 50
+        
+        # Código y descripción
+        page.insert_text((50, y), f"{row['Código']} - {row['Descripción']}", 
+                        fontsize=12, fontname="helv")
+        y += 20
+        
+        # SH asociados
+        sh_text = ", ".join(sorted(set(row['SH'])))  # Eliminar duplicados y ordenar
         page.insert_text((60, y), f"SH: {sh_text}", fontsize=10)
-        y += 20  # Espacio adicional entre items
-
-    # Total de códigos
-    page.insert_text((50, y), f"TOTAL CÓDIGOS ÚNICOS: {len(sorted_codes)}", fontsize=12, color=(0, 0, 1))
+        y += 30
     
     return doc
 
+def display_interactive_codes_table(order_data):
+    """Muestra una tabla interactiva con todos los códigos y SH asociados"""
+    data = []
+    
+    for oid, order_info in order_data.items():
+        for part_num, sh_list in order_info["part_numbers"].items():
+            for sh in sh_list:
+                data.append({
+                    "Orden": oid,
+                    "Código": part_num,
+                    "Descripción": PART_DESCRIPTIONS.get(part_num, "Desconocida"),
+                    "SH": sh
+                })
+    
+    if not data:
+        st.warning("No se encontraron códigos con SH asociados")
+        return
+    
+    df = pd.DataFrame(data)
+    
+    st.subheader("Informe Detallado de Códigos y SH Asociados")
+    
+    # Mostrar tabla interactiva
+    st.dataframe(
+        df.sort_values(by=["Código", "SH"]),
+        height=600,
+        use_container_width=True,
+        column_config={
+            "Descripción": st.column_config.TextColumn(width="large")
+        }
+    )
+    
+    # Opción para descargar como CSV
+    csv = df.to_csv(index=False, encoding='utf-8')
+    st.download_button(
+        "Descargar como CSV",
+        data=csv,
+        file_name='informe_codigos_sh.csv',
+        mime='text/csv'
+    )
 
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
 
-    # Insertar resumen al inicio
-    part_summary = create_part_numbers_summary(order_meta)
-    if part_summary:
-        doc.insert_pdf(part_summary)
-        insert_divider_page(doc, "Main Documents")
+    # Insertar informe detallado de códigos al inicio
+    codes_report = create_detailed_codes_report(order_meta)
+    if codes_report:
+        doc.insert_pdf(codes_report)
+        insert_divider_page(doc, "Documentos Principales")
 
     if pickup_flag and pickups:
-        insert_divider_page(doc, "Customer Pickup Orders")
+        insert_divider_page(doc, "Órdenes de Customer Pickup")
         for oid in pickups:
             for p in build_map.get(oid, {}).get("pages", []):
                 doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
@@ -277,40 +294,51 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag):
 
     return doc
 
-
 # === Interfaz de Streamlit ===
-st.title("Tequila Build/Shipment PDF Merger")
+st.title("Tequila - Procesador de PDFs")
 
-build_file = st.file_uploader("Upload Build Sheets PDF", type="pdf")
-ship_file = st.file_uploader("Upload Shipment Pick Lists PDF", type="pdf")
-pickup_flag = st.checkbox("Summarize Customer Pickup orders", value=True)
+# Upload de archivos
+col1, col2 = st.columns(2)
+with col1:
+    build_file = st.file_uploader("Subir Build Sheets PDF", type="pdf")
+with col2:
+    ship_file = st.file_uploader("Subir Shipment Pick Lists PDF", type="pdf")
 
-if build_file and ship_file and st.button("Generate Merged Output"):
+pickup_flag = st.checkbox("Incluir resumen de Customer Pickup", value=True)
+
+if build_file and ship_file:
+    # Procesar archivos
     build_bytes = build_file.read()
     ship_bytes = ship_file.read()
 
     build_pages = parse_pdf(build_bytes)
     ship_pages = parse_pdf(ship_bytes)
 
-    original_pages = build_pages + ship_pages
-    all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
+    # Combinar y procesar todas las páginas
+    all_pages = build_pages + ship_pages
+    order_data = group_by_order(all_pages, classify_pickup=pickup_flag)
 
-    build_map = group_by_order(build_pages)
-    ship_map = group_by_order(ship_pages)
+    # Mostrar informe interactivo
+    display_interactive_codes_table(order_data)
 
-    build_order = get_build_order_list(build_pages)
+    # Generar PDF combinado
+    if st.button("Generar PDF Combinado"):
+        build_map = group_by_order(build_pages)
+        ship_map = group_by_order(ship_pages)
+        build_order = get_build_order_list(build_pages)
 
-    # Generar resúmenes
-    summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
-    merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag)
+        # Generar resúmenes
+        summary = create_summary_page(order_data, build_map.keys(), ship_map.keys(), pickup_flag)
+        merged = merge_documents(build_order, build_map, ship_map, order_data, pickup_flag)
 
-    # Insertar resumen al inicio
-    if summary:
-        merged.insert_pdf(summary, start_at=0)
+        # Insertar resumen al inicio
+        if summary:
+            merged.insert_pdf(summary, start_at=0)
 
-    # Botón de descarga
-    st.download_button(
-        "Download Merged Output PDF",
-        data=merged.tobytes(),
-        file_name="Tequila_Merged_Output.pdf"
-    )
+        # Botón de descarga
+        st.download_button(
+            "Descargar PDF Combinado",
+            data=merged.tobytes(),
+            file_name="Tequila_Informe_Completo.pdf",
+            mime="application/pdf"
+        )
