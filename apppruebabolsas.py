@@ -19,15 +19,13 @@ def extract_identifiers(text):
 
 
 def extract_part_numbers(text):
-    """Extrae números de parte con coincidencia EXACTA y sin duplicados por página"""
     part_counts = {}
-    text = text.upper()  # Hacer búsqueda case-insensitive
+    text = text.upper()
 
-    # Recorrer todos los códigos posibles
     for part_num in PART_DESCRIPTIONS.keys():
-        # Buscar coincidencia exacta en el texto
-        if re.search(r'\b' + re.escape(part_num) + r'\b', text):
-            part_counts[part_num] = 1  # Contar solo una vez por página
+        # Usamos \b para asegurar que sea una palabra completa
+        if re.search(rf'\b{re.escape(part_num)}\b', text):
+            part_counts[part_num] = 1
 
     return part_counts
 
