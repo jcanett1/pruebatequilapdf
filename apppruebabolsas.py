@@ -19,48 +19,60 @@ def extract_identifiers(text):
 
 
 def extract_part_numbers(text):
-    """Extrae números de parte con coincidencia EXACTA del código + descripción"""
+    """Extrae números de parte buscando primero por DESCRIPCIÓN completa"""
     part_sh_numbers = defaultdict(list)
+
     text_upper = text.upper()
 
-    # Extraer número de shipment (ej: SH12345)
-    sh_match = re.search(r'SH\d+', text_upper)
-    sh_number = sh_match.group() if sh_match else "Unknown"
+    # Extraer todos los SH presentes en esta página
+    sh_matches = re.findall(r'SH\d+', text_upper)
+    sh_list = list(set(sh_matches))  # Eliminar duplicados
+    if not sh_list:
+        sh_list = ["Unknown"]
 
-    # Buscar cada parte por su clave completa (código - descripción)
-    for full_key in PART_DESCRIPTIONS.keys():
-        escaped = re.escape(full_key)
+    # Buscar por descripción completa
+    for description, part_num in DESCRIPTION_TO_CODE.items():
+        escaped = re.escape(description)
         if re.search(rf'\b{escaped}\b', text_upper):
-            part_sh_numbers[full_key].append(sh_number)
+            for sh in sh_list:
+                part_sh_numbers[part_num].append(sh)
+
+    # Si no se encontró nada, usar búsqueda por código como respaldo
+    if not part_sh_numbers:
+        for part_num in PART_DESCRIPTIONS.keys():
+            escaped = re.escape(part_num)
+            if re.search(rf'\b{escaped}\b', text_upper):
+                for sh in sh_list:
+                    part_sh_numbers[part_num].append(sh)
 
     return part_sh_numbers
 # === Definición correcta de partes (diccionario) ===
 PART_DESCRIPTIONS = {
-    'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
-    'B-PG-082-WHT': '2023 PXG Lightweight Cart Bag - White/Black',
-    'B-PG-172': '2025 Stars & Stripes LW Carry Stand Bag',
-    'B-PG-172-BGRY': 'Xtreme Carry Stand Bag - Black',
-    'B-PG-172-BLACK': 'Xtreme Carry Stand Bag - Freedom - Black',
-    'B-PG-172-DB': 'Deluxe Carry Stand Bag - Black',
-    'B-PG-172-DKNSS': 'Deluxe Carry Stand Bag - Darkness',
-    'B-PG-172-DW': 'Deluxe Carry Stand Bag - White',
-    'B-PG-172-GREEN': 'Xtreme Carry Stand Bag - Freedom - Green',
-    'B-PG-172-GREY': 'Xtreme Carry Stand Bag - Freedom - Grey',
-    'B-PG-172-NAVY': 'Xtreme Carry Stand Bag - Freedom - Navy',
-    'B-PG-172-TAN': 'Xtreme Carry Stand Bag - Freedom - Tan',
-    'B-PG-172-WBLK': 'Xtreme Carry Stand Bag - White',
-    'B-PG-173': '2025 Stars & Stripes Hybrid Stand Bag',
-    'B-PG-173-BGRY': 'Xtreme Hybrid Stand Bag - Black',
-    'B-PG-173-BO': 'Deluxe Hybrid Stand Bag - Black',
-    'B-PG-173-DKNSS': 'Deluxe Hybrid Stand Bag - Darkness',
-    'B-PG-173-WBLK': 'Xtreme Hybrid Stand Bag - White',
-    'B-PG-173-WO': 'Deluxe Hybrid Stand Bag - White',
-    'B-PG-244': 'Xtreme Cart Bag - White',
-    'B-PG-245': '2025 Stars & Stripes Cart Bag',
-    'B-PG-245-BLK': 'Deluxe Cart Bag B2 - Black',
-    'B-PG-245-WHT': 'Deluxe Cart Bag B2 - White',
-    'B-PG-246-POLY': 'Minimalist Carry Stand Bag - Black',
-    'B-UGB8-EP': '2020 Carry Stand Bag - Black'
+    "2023 PXG Deluxe Cart Bag - Black": "B-PG-081-BLK",
+    "2023 PXG Lightweight Cart Bag - White/Black": "B-PG-082-WHT",
+    "2025 Stars & Stripes LW Carry Stand Bag": "B-PG-172",
+    "Xtreme Carry Stand Bag - Black": "B-PG-172-BGRY",
+    "Xtreme Carry Stand Bag - Freedom - Black": "B-PG-172-BLACK",
+    "Deluxe Carry Stand Bag - Black": "B-PG-172-DB",
+    "Deluxe Carry Stand Bag - Darkness": "B-PG-172-DKNSS",
+    "Deluxe Carry Stand Bag - White": "B-PG-172-DW",
+    "Xtreme Carry Stand Bag - Freedom - Green": "B-PG-172-GREEN",
+    "Xtreme Carry Stand Bag - Freedom - Grey": "B-PG-172-GREY",
+    "Xtreme Carry Stand Bag - Freedom - Navy": "B-PG-172-NAVY",
+    "Xtreme Carry Stand Bag - Freedom - Tan": "B-PG-172-TAN",
+    "Xtreme Carry Stand Bag - White": "B-PG-172-WBLK",
+    "2025 Stars & Stripes Hybrid Stand Bag": "B-PG-173",
+    "Xtreme Hybrid Stand Bag - Black": "B-PG-173-BGRY",
+    "Deluxe Hybrid Stand Bag - Black": "B-PG-173-BO",
+    "Deluxe Hybrid Stand Bag - Darkness": "B-PG-173-DKNSS",
+    "Xtreme Hybrid Stand Bag - White": "B-PG-173-WBLK",
+    "Deluxe Hybrid Stand Bag - White": "B-PG-173-WO",
+    "Xtreme Cart Bag - White": "B-PG-244",
+    "2025 Stars & Stripes Cart Bag": "B-PG-245",
+    "Deluxe Cart Bag B2 - Black": "B-PG-245-BLK",
+    "Deluxe Cart Bag B2 - White": "B-PG-245-WHT",
+    "Minimalist Carry Stand Bag - Black": "B-PG-246-POLY",
+    "2020 Carry Stand Bag - Black": "B-UGB8-EP"
 }
 
 
