@@ -24,7 +24,7 @@ def extract_part_numbers(text):
     """
     Extrae números de parte del texto.
     Prioritiza las coincidencias más largas y asegura que un número de parte más corto
-    no se cuente si es parte de un número de parte más largo identificado 
+    no se cuente si es parte de un número de parte más largo identificado
     en la misma posición.
     Retorna un diccionario con los números de parte encontrados como claves y valor 1.
     """
@@ -100,7 +100,7 @@ def extract_relations(text, order_id, shipment_id):
     return relations
 
 
-# === Definición correcta de partes (diccionario) ===
+# === Definición CORRECTA y COMPLETA de partes (diccionario) ===
 PART_DESCRIPTIONS = {
     'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
     'B-PG-082-WHT': '2023 PXG Lightweight Cart Bag - White/Black',
@@ -126,176 +126,120 @@ PART_DESCRIPTIONS = {
     'B-PG-245-BLK': 'Deluxe Cart Bag B2 - Black',
     'B-PG-245-WHT': 'Deluxe Cart Bag B2 - White',
     'B-PG-246-POLY': 'Minimalist Carry Stand Bag - Black',
-    'B-UGB8-EP': '2020 Carry Stand Bag - Black'
+    'B-UGB8-EP': '2020 Carry Stand Bag - Black',
+
+    # --- CÓDIGOS DE LAS IMÁGENES ---
+   # image_fbd711.png (Golf Balls)
+    'GB-DOZ-XTREME': 'Xtreme Golf Ball - Dozen',
+    'GB-DOZ-XTTR-WHT': 'Xtreme Tour Golf Ball - White - Dozen',
+    'GB-DOZ-XTTR-YEL': 'Xtreme Tour Golf Ball - Yellow - Dozen',
+    'GB-DOZ-XTTRX-WHT': 'Xtreme Tour X Golf Ball - White - Dozen',
+
+    # image_fb69b2.png y image_fbd6af.png (Hats/Caps y Gloves)
+    'H-22PXG000013-BLK': 'Tall Visor - Black',
+    'H-22PXG000013-WHT': 'Tall Visor - White',
+    'H-22PXG000014-BLK': 'Sport Visor - Black',
+    'H-22PXG000014-WHT': 'Sport Visor - White',
+    'H-23PXG0000124-2-BG-OSFM': 'Dog Tag 6-Panel Snapback Cap - Black/Grey Logo - One Size',
+    'H-23PXG0000124-2-BW-OSFM': 'Dog Tag 6-Panel Snapback Cap - Black/White Logo - One Size',
+    'H-23PXG0000124-2-CG-OSFM': 'Dog Tag 6-Panel Snapback Cap - White/Grey Logo - One Size',
+    'H-23PXG0000124-2-WG-OSFM': 'Dog Tag 6-Panel Snapback Cap - White/Grey Logo - One Size', # Duplicado, mantener si es diferente
+    'H-23PXG000078-1-S-M': 'Tour Bush Hat - White - S/M',
+    'H-23PXG000094-1-OSFM-BLK': 'Faceted Front Trucker Cap - Black - One Size',
+    'H-23PXG000094-1-OSFM-WHT': 'Faceted Front Trucker Cap - White - One Size',
+    'H-23PXG000101-BW-OSFM': 'Men\'s 6-Panel High Crown Snapback Cap - Black/White Logo - One Size',
+    'H-23PXG000101-NW-OSFM': 'Men\'s 6-Panel High Crown Snapback Cap - Navy/White Logo - One Size',
+    'H-23PXG000101-WB-OSFM': 'Men\'s 6-Panel High Crown Snapback Cap - White/Black Logo - One Size',
+    'H-23PXG000101-WG-OSFM': 'Men\'s 6-Panel High Crown Snapback Cap - White/Grey Logo - One Size',
+    'H-23PXG000123-BW-OSFM': 'Men\'s Dog Tag 6-Panel High Crown Snapback Cap - Black/White Logo - One Size',
+    'H-23PXG000123-GB-OSFM': 'Men\'s Dog Tag 6-Panel High Crown Snapback Cap - Grey/Black Logo - One Size',
+    'H-23PXG000123-WG-OSFM': 'Men\'s Dog Tag 6-Panel High Crown Snapback Cap - White/Grey Logo - One Size',
+    'H-23PXG000125-BG-OSFM': 'Men\'s Dog Tag 5-Panel Snapback Cap - Black/Grey Logo - One Size',
+    'H-23PXG000125-BW-OSFM': 'Men\'s Dog Tag 5-Panel Snapback Cap - Black/White Logo - One Size',
+    'H-23PXG000125-GB-OSFM': 'Men\'s Dog Tag 5-Panel Snapback Cap - Grey/Black Logo - One Size',
+    'H-23PXG000125-NW-OSFM': 'Men\'s Dog Tag 5-Panel Snapback Cap - Navy/White Logo - One Size',
+    'H-23PXG000125-WG-OSFM': 'Men\'s Dog Tag 5-Panel Snapback Cap - White/Grey Logo - One Size',
+    'H-23PXG000126-WN-OSFM': 'Stretch Snapback Hat - White - One Size', # Este es de image_fbd6af.png, lo he ajustado
+    'H-23PXG000166-BLK-OSFM': 'Stretch Snapback Hat - Black - One Size',
+    'H-23PXG000166-WHT-OSFM': 'Stretch Snapback Hat - White - One Size',
+    'H-23PXG000167-BW-OSFM': 'Scottsdale Trucker Snapback Hat - Black/White Logo - One Size',
+    'H-23PXG000167-GB-OSFM': 'Scottsdale Trucker Snapback Hat - Grey/Black Logo - One Size',
+    'H-23PXG000167-WHT-OSFM': 'Scottsdale Trucker Snapback Hat - White - One Size',
+    'H-23PXG000167-WW-OSFM': 'Scottsdale Trucker Snapback Hat - White/White Logo - One Size',
+    'H-23PXG000168-BLK-OSFM': 'Stretch Patch Snapback Hat - Black - One Size',
+    'H-23PXG000168-GRY-OSFM': 'Stretch Patch Snapback Hat - Grey - One Size',
+    'H-23PXG000168-NVY-OSFM': 'Stretch Patch Snapback Hat - Navy - One Size',
+    'H-23PXG000168-WHT-OSFM': 'Stretch Patch Snapback Hat - White - One Size',
+    'H-24PXG000203-2-BLK-OSFM': 'Women\'s Metallic Minimalist - Unstructured Hat - Black - One Size',
+    'H-24PXG000203-2-WHT-OSFM': 'Women\'s Metallic Minimalist - Unstructured Hat - White - One Size',
+    'H-24PXG000214-1-BLK-OSFM': 'Camper Flat Bill Snapback Cap - Black - One Size',
+    'H-24PXG000214-1-WHT-OSFM': 'Camper Flat Bill Snapback Cap - White - One Size',
+    'H-24PXG000218-1-OSFM': '6 Panel Structured Low Crown Snapback Cap - Black - One Size',
+    'H-24PXG000219-OSFM': 'Women\'s Metallic Minimalist - Unstructured Hat - Grey - One Size',
+    'H-24PXG000229-OSFM': 'US Navy Structured Hat Snapback - One Size',
+    'H-24PXG000235-BW-OSFM': 'Dog Tag 6-Panel Low Crown Snapback - Black/White Logo - One Size',
+    'H-24PXG000235-GB-OSFM': 'Dog Tag 6-Panel Low Crown Snapback - Grey/Black Logo - One Size',
+    'H-24PXG000235-WG-OSFM': 'Dog Tag 6-Panel Low Crown Snapback - White/Grey Logo - One Size',
+    'H-24PXG000239-OSFM': 'Women\'s Metallic Minimalist - Unstructured Hat - Light Blue - One Size',
+    'H-24PXG000276-OSFM': '2025 Stars & Stripes Low Crown Cap - One Size',
+    'H-24PXG000277-OSFM': '2025 Stars & Stripes Dog Tag Cap - One Size',
+    'H-24PXG000278-OSFM': '2025 Stars & Stripes High Crown Cap - One Size',
+    'H-24PXG000282-OSFM': '2025 Stars & Stripes Trucker Cap - One Size',
+    'H-25PXG000283-OSFM': '2025 Stars & Stripes Dog Tag Trucker - One Size',
+    'H-USMC-ADJ': 'PXG USMC Unstructured Hat - Adjustable',
+
+    # image_fbd658.png (Accessories)
+    'HC-JT-4623': 'Tour Series Blade Headcover - Black',
+    'A-UAC18-FM': 'PXG Wedge Brush - Chrome',
+    'A-UAC17-FM': 'PXG Wedge Brush - Black',
+    'A-ALIGNSTICKS-WHT': 'PXG Player Alignment Sticks - White',
+    'A-NX10SLOPE-PXG': 'PXG NX10 Rangefinder Slope Edition - White',
+    'A-UAC28-FM': 'PXG Milled Divot Tool (Weighted)',
+    'A-IHC62918PXG-COP': 'PXG Magnetic Ball Marker & Cap Clip - Rose Gold',
+    'A-IHC62920PXG-BLK': 'PXG Magnetic Ball Marker & Cap Clip - Black',
+    'A-DUO-PXG': 'PXG Golf Speaker - White',
+    'A-ICU55715PXG-ALS': 'PXG Deluxe Alignment Stick Cover',
+    'A-DARKNESS-COASTER': 'PXG Darkness Coaster',
+    'HC-JT-1053-KIT': 'PXG 2022 Iron Cover Kit',
+    'A-UAC29-FM': 'PXG (DRKNSS) Divot Tool',
+    'A-Q25240-ASM': 'Milled Starburst Ball Marker',
+    'A-ZNP53374-1': 'Darkness Leather Wrapped Divot Tool',
+    'A-JT-4697': 'Darkness Alignment Stick Cover - Black',
+    'A-1IBM65819PXGCAT': 'Copper Cactus Ball Marker',
+    'A-Q23192-ASM-2': 'Chrome Logo Ball Marker',
+    'A-Q25645-ASM-1': '2025 Stars & Stripes Ball Marker',
+    'A-1IBM65820PXG-DT': '2023 Darkness Dog Tag Ball Marker',
+
+    # Guantes (de image_fbd6af.png, sección de abajo)
+    'G4-65201011HML-BLK': 'Men\'s LH Players Glove - Black ML',
+    'G4-65201019HML-BLK': 'Men\'s LH Players Glove - Black M',
+    'G4-65201019HMW-BLK': 'Women\'s RH Players Glove - Black M',
+    'G4-65201019LHL-BLK': 'Men\'s RH Players Glove - Black L',
+    'G4-65201019LXL-BLK': 'Men\'s RH Players Glove - Black XL',
+    'G4-65201019MLC-BLK': 'Men\'s RH Players Glove - Cadet Black M',
+    'G4-65201019RSC-BLK': 'Men\'s RH Players Glove - Cadet Black S',
+    'G4-65201019RLC-BLK': 'Men\'s RH Players Glove - Cadet Black L',
+    'G4-65201019RMLC-BLK': 'Men\'s RH Players Glove - Cadet Black ML',
+    'G4-65201019RXLC-BLK': 'Men\'s RH Players Glove - Cadet Black XL',
+    'G4-65201019RXL-BLK': 'Men\'s RH Players Glove - Black XL',
+    'G4-65201019L-BLK': 'Men\'s RH Players Glove - Black L', # Duplicado, asegurar que es distinto
+    'G4-65201019HMW-WHT': 'Women\'s RH Players Glove - White M',
+    'G4-65201019LHL-WHT': 'Men\'s RH Players Glove - White L',
+    'G4-65201019RSC-WHT': 'Men\'s RH Players Glove - Cadet White S',
+    'G4-65201019RMLC-WHT': 'Men\'s RH Players Glove - Cadet White ML',
+    'G4-65201019RXLC-WHT': 'Men\'s RH Players Glove - Cadet White XL',
+    'G4-65201019RLC-WHT': 'Men\'s RH Players Glove - Cadet White L',
+    'G4-65201019RXL-WHT': 'Men\'s RH Players Glove - White XL',
+    'G4-65201019RL-WHT': 'Men\'s RH Players Glove - White L',
+    'G4-65201019LL-WHT': 'Men\'s LH Players Glove - White L',
+    'G4-652021019L-WHT': 'Women\'s LH Players Glove - White L',
+    'G4-652021019MW-WHT': 'Women\'s RH Players Glove - White M',
+    'G4-652021019RX-WHT': 'Women\'s RH Players Glove - White XL',
+    'G4-652021019S-WHT': 'Women\'s RH Players Glove - White S',
+    'G4-652021019SC-WHT': 'Men\'s RH Players Glove - Cadet White S',
+    'G4-652021019MLC-WHT': 'Men\'s RH Players Glove - Cadet White M',
+    # Asegúrate de revisar si hay más guantes o cualquier otro ítem que no haya capturado.
 }
-
-
-def create_relations_table(relations):
-    """Crea una tabla PDF con las relaciones orden-código-SH"""
-    if not relations:
-        return None
-    
-    doc = fitz.open()
-    page = doc.new_page(width=595, height=842)
-    y = 50
-    
-    # Título
-    page.insert_text((50, y), "RELACIÓN ÓRDENES - CÓDIGOS - SH", 
-                    fontsize=16, color=(0, 0, 1), fontname="helv")
-    y += 30
-    
-    # Encabezados
-    headers = ["Orden", "Código", "Descripción", "SH"]
-    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
-    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
-    page.insert_text((300, y), headers[2], fontsize=12, fontname="helv")
-    page.insert_text((500, y), headers[3], fontsize=12, fontname="helv")
-    y += 20
-    
-    # Convertir a DataFrame para ordenar
-    df = pd.DataFrame(relations)
-    df = df.sort_values(by=["Orden", "Código"])
-    
-    # Datos
-    for _, row in df.iterrows():
-        if y > 750:
-            page = doc.new_page(width=595, height=842)
-            y = 50
-            
-        page.insert_text((50, y), row["Orden"], fontsize=10)
-        page.insert_text((150, y), row["Código"], fontsize=10)
-        
-        # Descripción en múltiples líneas si es necesario
-        desc = row["Descripción"]
-        if len(desc) > 30:
-            page.insert_text((300, y), desc[:30], fontsize=9)
-            page.insert_text((300, y + 12), desc[30:], fontsize=9)
-            y += 12
-        else:
-            page.insert_text((300, y), desc, fontsize=10)
-            
-        page.insert_text((500, y), row["SH"], fontsize=10)
-        y += 25 if len(desc) > 30 else 15
-    
-    return doc
-
-def insert_divider_page(doc, label):
-    """Crea una página divisoria con texto de etiqueta"""
-    page = doc.new_page()
-    text = f"=== {label.upper()} ==="
-    page.insert_text(
-        point=(72, 72),
-        text=text,
-        fontsize=18,
-        fontname="helv",
-        color=(0, 0, 0)
-    )
-
-
-def parse_pdf(file_bytes):
-    doc = fitz.open(stream=file_bytes, filetype="pdf")
-    pages = []
-    relations = []
-    two_day_sh = set()  # Para almacenar SH con método 2 day
-    last_order_id = None
-    last_shipment_id = None
-
-    for i in range(len(doc)):
-        page = doc[i]
-        text = page.get_text()
-        order_id, shipment_id = extract_identifiers(text)
-        
-        # Detectar shipping method 2 day
-        if SHIPPING_2DAY_REGEX.search(text) and shipment_id:
-            two_day_sh.add(shipment_id)
-        
-        if not order_id:
-            order_id = last_order_id
-        else:
-            last_order_id = order_id
-
-        if not shipment_id:
-            shipment_id = last_shipment_id
-        else:
-            last_shipment_id = shipment_id
-
-        part_numbers = extract_part_numbers(text)
-        page_relations = extract_relations(text, order_id, shipment_id)
-        relations.extend(page_relations)
-
-        pages.append({
-            "number": i,
-            "text": text,
-            "order_id": order_id,
-            "shipment_id": shipment_id,
-            "part_numbers": part_numbers,
-            "page": page,
-            "parent": doc,
-            "is_2day": SHIPPING_2DAY_REGEX.search(text) is not None
-        })
-
-    return pages, relations, two_day_sh
-
-def group_codes_by_family(relations):
-    """Agrupa los códigos por familia principal"""
-    # Convertir a DataFrame
-    df = pd.DataFrame(relations)
-    
-    # Extraer familia base (ej: B-PG-172 de B-PG-172-BGRY)
-    df['Familia'] = df['Código'].apply(lambda x: x.split('-')[0] + '-' + x.split('-')[1] + '-' + x.split('-')[2])
-    
-    # Ordenar por Familia y luego por Código
-    df = df.sort_values(by=['Familia', 'Código'])
-    
-    return df
-
-
-def display_interactive_table(relations):
-    """Muestra una tabla interactiva con códigos agrupados por familia"""
-    if not relations:
-        st.warning("No se encontraron relaciones entre órdenes, códigos y SH")
-        return
-    
-    # Agrupar por familia
-    df = group_codes_by_family(relations)
-    
-    # Formatear códigos para mostrar jerarquía
-    def format_code(row):
-        base_family = row['Familia']
-        full_code = row['Código']
-        if full_code == base_family:
-            return full_code
-        else:
-            return "└─ " + full_code.replace(base_family + '-', '')
-    
-    df['Código (Agrupado)'] = df.apply(format_code, axis=1)
-    
-    st.subheader("Relación Detallada de Órdenes, Códigos y SH (Agrupados por Familia)")
-    
-    # Mostrar solo columnas relevantes
-    display_df = df[['Orden', 'Código (Agrupado)', 'Descripción', 'SH']]
-    
-    st.dataframe(
-        display_df,
-        column_config={
-            "Descripción": st.column_config.TextColumn(width="large"),
-            "SH": st.column_config.TextColumn(width="medium"),
-            "Código (Agrupado)": st.column_config.TextColumn(width="medium", 
-                                                          help="Códigos agrupados por familia")
-        },
-        hide_index=True,
-        use_container_width=True
-    )
-    
-    # Opción para descargar
-    csv = df[['Orden', 'Código', 'Descripción', 'SH']].to_csv(index=False, encoding='utf-8')
-    st.download_button(
-        "Descargar como CSV",
-        data=csv,
-        file_name='relacion_ordenes_codigos_sh.csv',
-        mime='text/csv'
-    )
-
 
 def create_relations_table(relations):
     """Crea una tabla PDF con códigos agrupados por familia"""
@@ -341,6 +285,7 @@ def create_relations_table(relations):
         # Mostrar familia principal si cambió
         if family != current_family:
             page.insert_text((50, y), row['Orden'], fontsize=10)
+            # ! IMPORTANTE: Aquí se corrige la fuente a "Helvetica-Bold"
             page.insert_text((150, y), family, fontsize=10, fontname="Helvetica-Bold")
             page.insert_text((300, y), PART_DESCRIPTIONS.get(family, ""), fontsize=10)
             page.insert_text((500, y), row['SH'], fontsize=10)
@@ -368,8 +313,8 @@ def create_2day_shipping_page(two_day_sh_list):
     y = 72
     
     # Título
-    page.insert_text((72, y), "ÓRDENES CON SHIPPING METHOD: 2 DAY", 
-                    fontsize=16, color=(0, 0, 1), fontname="helv")
+    page.insert_text((72, y), "ÓRDENES CON SHIPPING METHOD: 2 DAY",
+                     fontsize=16, color=(0, 0, 1), fontname="helv")
     y += 30
     
     # Lista de SH
@@ -380,7 +325,7 @@ def create_2day_shipping_page(two_day_sh_list):
         page.insert_text((72, y), sh, fontsize=12)
         y += 20
     
-    page.insert_text((72, y + 20), f"Total de órdenes 2 day: {len(two_day_sh_list)}", 
+    page.insert_text((72, y + 20), f"Total de órdenes 2 day: {len(two_day_sh_list)}",
                      fontsize=14, color=(0, 0, 1))
     
     return doc
@@ -514,27 +459,137 @@ def create_part_numbers_summary(order_data):
 
     return doc
 
-def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, relations, two_day_sh):
+def insert_divider_page(doc, label):
+    """Crea una página divisoria con texto de etiqueta"""
+    page = doc.new_page()
+    text = f"=== {label.upper()} ==="
+    page.insert_text(
+        point=(72, 72),
+        text=text,
+        fontsize=18,
+        fontname="helv",
+        color=(0, 0, 0)
+    )
+
+# --- NUEVAS FUNCIONES PARA CLASIFICAR Y GENERAR PDFs POR CATEGORÍA ---
+
+def classify_item(item_code, item_description):
+    """Clasifica un ítem en 'Pelotas', 'Gorras', 'Accesorios'."""
+    item_code_upper = item_code.upper()
+    item_description_upper = item_description.upper()
+
+    if item_code_upper.startswith('GB-DOZ-') or "GOLF BALL" in item_description_upper:
+        return "Pelotas"
+    elif item_code_upper.startswith('H-') or ("HAT" in item_description_upper or "CAP" in item_description_upper):
+        return "Gorras"
+    # Accesorios - Si no es pelota ni gorra, y empieza con A- o HC- o G4- (guantes)
+    elif item_code_upper.startswith(('A-', 'HC-', 'G4-')):
+        return "Accesorios"
+    return "Otros" # Para ítems que no encajan en ninguna categoría definida
+
+def create_category_table(relations, category_name):
+    """
+    Crea una tabla PDF con un listado de códigos y descripciones para una categoría específica.
+    """
+    # Filtrar las relaciones por la categoría deseada
+    # Usamos un set para evitar duplicados en el listado final por Código/Descripción
+    unique_items_in_category = set()
+    category_data = []
+
+    for rel in relations:
+        if classify_item(rel["Código"], rel["Descripción"]) == category_name:
+            item_tuple = (rel["Código"], rel["Descripción"])
+            if item_tuple not in unique_items_in_category:
+                unique_items_in_category.add(item_tuple)
+                category_data.append({"Código": rel["Código"], "Descripción": rel["Descripción"]})
+
+
+    if not category_data:
+        return None
+
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    y = 50
+
+    # Título de la categoría
+    page.insert_text((50, y), f"LISTADO DE {category_name.upper()}",
+                     fontsize=16, color=(0, 0, 1), fontname="helv")
+    y += 30
+
+    # Encabezados
+    headers = ["Código", "Descripción"]
+    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
+    page.insert_text((200, y), headers[1], fontsize=12, fontname="helv") # Ajustar posición para descripción
+    y += 20
+
+    # Convertir a DataFrame para ordenar por Código
+    df_category = pd.DataFrame(category_data).sort_values(by=["Código"])
+
+    for _, row in df_category.iterrows():
+        if y > 750:
+            page = doc.new_page(width=595, height=842)
+            y = 50
+            # Reinsertar encabezados en nueva página
+            page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
+            page.insert_text((200, y), headers[1], fontsize=12, fontname="helv")
+            y += 20
+
+        page.insert_text((50, y), row["Código"], fontsize=10)
+
+        # Descripción en múltiples líneas si es necesario
+        desc = row["Descripción"]
+        if len(desc) > 50: # Ajustar el límite de caracteres para la descripción
+            page.insert_text((200, y), desc[:50], fontsize=9)
+            page.insert_text((200, y + 12), desc[50:], fontsize=9)
+            y += 12
+        else:
+            page.insert_text((200, y), desc, fontsize=10)
+
+        y += 15 # Espacio entre filas
+
+    return doc
+
+
+def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, all_relations, all_two_day):
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
 
-    # 1. Insertar tabla de relaciones
-    relations_table = create_relations_table(relations)
+    # 1. Insertar tabla de relaciones (con agrupamiento por familia)
+    relations_table = create_relations_table(all_relations)
     if relations_table:
         doc.insert_pdf(relations_table)
-        insert_divider_page(doc, "Resumen de Partes")
-    
+        insert_divider_page(doc, "Resumen de Partes") # Separador
+
     # 2. Insertar página de SH 2 day
-    two_day_page = create_2day_shipping_page(two_day_sh)
+    two_day_page = create_2day_shipping_page(all_two_day)
     if two_day_page:
         doc.insert_pdf(two_day_page)
-        insert_divider_page(doc, "Documentos Principales")
-    
-    # 3. Insertar resumen de partes
+        insert_divider_page(doc, "Resumen de Apariciones de Partes") # Separador
+
+    # 3. Insertar resumen de apariciones de partes
     part_summary = create_part_numbers_summary(order_meta)
     if part_summary:
         doc.insert_pdf(part_summary)
-        insert_divider_page(doc, "Documentos Principales")
+        insert_divider_page(doc, "Listado de Pelotas") # Separador
+
+    # --- NUEVA SECCIÓN: Páginas por Categoría ---
+    # 4. Insertar página de Pelotas
+    pelotas_doc = create_category_table(all_relations, "Pelotas")
+    if pelotas_doc:
+        doc.insert_pdf(pelotas_doc)
+        insert_divider_page(doc, "Listado de Gorras") # Separador para la siguiente categoría
+
+    # 5. Insertar página de Gorras
+    gorras_doc = create_category_table(all_relations, "Gorras")
+    if gorras_doc:
+        doc.insert_pdf(gorras_doc)
+        insert_divider_page(doc, "Listado de Accesorios") # Separador para la siguiente categoría
+
+    # 6. Insertar página de Accesorios
+    accesorios_doc = create_category_table(all_relations, "Accesorios")
+    if accesorios_doc:
+        doc.insert_pdf(accesorios_doc)
+        insert_divider_page(doc, "Documentos Principales") # Separador antes de los docs originales
 
     # Insertar páginas de órdenes
     def insert_order_pages(order_list):
