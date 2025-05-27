@@ -460,14 +460,20 @@ def group_by_order(pages, classify_pickup=False):
     return order_map
 
 
-def create_part_numbers_summary(order_data):
+def create_part_numbers_summary(order_data, category_filter=None):
+    """
+    Crea una tabla PDF con el resumen de apariciones de números de parte,
+    opcionalmente filtrado por categoría.
+    """
     part_appearances = defaultdict(int)
 
     for oid, data in order_data.items():
         part_numbers = data.get("part_numbers", {})
         for part_num, count in part_numbers.items():
             if part_num in PART_DESCRIPTIONS:
-                part_appearances[part_num] += count
+                # Aplicar el filtro de categoría si se proporciona
+                if category_filter is None or classify_item(part_num, PART_DESCRIPTIONS[part_num]) == category_filter:
+                    part_appearances[part_num] += count
 
     if not part_appearances:
         return None
@@ -480,22 +486,27 @@ def create_part_numbers_summary(order_data):
     left_margin_desc = 150
     left_margin_count = 450
 
+    # Título dinámico basado en el filtro de categoría
+    summary_title = f"RESUMEN DE APARICIONES DE PARTES: {category_filter.upper() if category_filter else 'GENERAL'}"
+    page.insert_text((left_margin_code, y_coordinate - 30), summary_title, fontsize=16, color=(0, 0, 1))
+    
     headers = ["Código", "Descripción", "Apariciones"]
-    # MODIFICADO: Se eliminó fontname="Helvetica" para usar la fuente predeterminada
     page.insert_text((left_margin_code, y_coordinate), headers[0], fontsize=12)
     page.insert_text((left_margin_desc, y_coordinate), headers[1], fontsize=12)
     page.insert_text((left_margin_count, y_coordinate), headers[2], fontsize=12)
     y_coordinate += 25
 
-    for part_num in sorted(part_appearances.keys()):
-        count = part_appearances[part_num]
+    # Ordenar las partes alfabéticamente
+    sorted_parts = sorted(part_appearances.items())
+
+    for part_num, count in sorted_parts:
         if count == 0:
             continue
         
         if y_coordinate > 750:
             page = doc.new_page(width=595, height=842)
             y_coordinate = 72
-            # MODIFICADO: Encabezados en nueva página también usan fuente predeterminada
+            page.insert_text((left_margin_code, y_coordinate - 30), summary_title, fontsize=16, color=(0, 0, 1)) # Re-insert title
             page.insert_text((left_margin_code, y_coordinate), headers[0], fontsize=12)
             page.insert_text((left_margin_desc, y_coordinate), headers[1], fontsize=12)
             page.insert_text((left_margin_count, y_coordinate), headers[2], fontsize=12)
@@ -505,6 +516,7 @@ def create_part_numbers_summary(order_data):
         
         page.insert_text((left_margin_code, y_coordinate), part_num, fontsize=10)
 
+        # Manejo de descripciones largas
         if len(description) > 40:
             page.insert_text((left_margin_desc, y_coordinate), description[:40], fontsize=9)
             page.insert_text((left_margin_desc, y_coordinate + 12), description[40:], fontsize=9)
@@ -523,12 +535,11 @@ def create_part_numbers_summary(order_data):
         page = doc.new_page(width=595, height=842)
         y_coordinate = 72
 
-    # MODIFICADO: Se eliminó fontname="Helvetica" para usar la fuente predeterminada
     page.insert_text(
         (left_margin_code, y_coordinate),
-        f"TOTAL GENERAL DE APARICIONES: {total_appearances}",
+        f"TOTAL DE APARICIONES ({category_filter if category_filter else 'GENERAL'}): {total_appearances}",
         fontsize=14,
-        color=(0, 0, 1) # Color azul
+        color=(0, 0, 1)
     )
 
     return doc
@@ -647,38 +658,56 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
 
-    # 1. Insertar tabla de relaciones (con agrupamiento por familia)
+    # 1. Insertar tabla de relaciones (con agrupamiento por familia y exclusión de categorías)
     relations_table = create_relations_table(all_relations)
     if relations_table:
         doc.insert_pdf(relations_table)
-        insert_divider_page(doc, "Resumen de Partes") # Separador
+        insert_divider_page(doc, "Resumen de Apariciones por Categoría") # Nuevo Separador
 
-    # 2. Insertar página de SH 2 day
+    # --- NUEVA SECCIÓN: Resumen de Apariciones por Categoría ---
+    # 2. Resumen de Apariciones: Bolsas (o 'Otros' si prefieres llamarlo así)
+    summary_bags = create_part_numbers_summary(order_meta, category_filter="Otros")
+    if summary_bags:
+        doc.insert_pdf(summary_bags)
+        insert_divider_page(doc, "Resumen de Apariciones: Pelotas")
+
+    # 3. Resumen de Apariciones: Pelotas
+    summary_balls = create_part_numbers_summary(order_meta, category_filter="Pelotas")
+    if summary_balls:
+        doc.insert_pdf(summary_balls)
+        insert_divider_page(doc, "Resumen de Apariciones: Gorras")
+
+    # 4. Resumen de Apariciones: Gorras
+    summary_hats = create_part_numbers_summary(order_meta, category_filter="Gorras")
+    if summary_hats:
+        doc.insert_pdf(summary_hats)
+        insert_divider_page(doc, "Resumen de Apariciones: Accesorios")
+
+    # 5. Resumen de Apariciones: Accesorios
+    summary_accessories = create_part_numbers_summary(order_meta, category_filter="Accesorios")
+    if summary_accessories:
+        doc.insert_pdf(summary_accessories)
+        insert_divider_page(doc, "Órdenes con Shipping Method: 2 Day") # Separador
+
+    # 6. Insertar página de SH 2 day
     two_day_page = create_2day_shipping_page(all_two_day)
     if two_day_page:
         doc.insert_pdf(two_day_page)
-        insert_divider_page(doc, "Resumen de Apariciones de Partes") # Separador
+        insert_divider_page(doc, "Listado de Pelotas por Relación") # Separador
 
-    # 3. Insertar resumen de apariciones de partes
-    part_summary = create_part_numbers_summary(order_meta)
-    if part_summary:
-        doc.insert_pdf(part_summary)
-        insert_divider_page(doc, "Listado de Pelotas") # Separador
-
-    # --- NUEVA SECCIÓN: Páginas por Categoría ---
-    # 4. Insertar página de Pelotas
+    # 7. Insertar página de Pelotas (listado de relaciones, no de apariciones)
     pelotas_doc = create_category_table(all_relations, "Pelotas")
     if pelotas_doc:
         doc.insert_pdf(pelotas_doc)
-        insert_divider_page(doc, "Listado de Gorras") # Separador para la siguiente categoría
+        insert_divider_page(doc, "Listado de Gorras por Relación") # Separador para la siguiente categoría
 
-    # 5. Insertar página de Gorras
+    # 8. Insertar página de Gorras (listado de relaciones)
     gorras_doc = create_category_table(all_relations, "Gorras")
     if gorras_doc:
         doc.insert_pdf(gorras_doc)
-        insert_divider_page(doc, "Listado de Accesorios") # Separador para la siguiente categoría
+        insert_divider_page(doc, "Listado de Accesorios por Relación") # Separador para la siguiente categoría
 
-    # 6. Insertar página de Accesorios
+    # 9. Insertar página de Accesorios (listado de relaciones)
     accesorios_doc = create_category_table(all_relations, "Accesorios")
     if accesorios_doc:
         doc.insert_pdf(accesorios_doc)
@@ -709,54 +738,3 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
         insert_order_pages(others)
 
     return doc
-
-# === Interfaz de Streamlit ===
-st.title("Tequila Build/Shipment PDF Processor")
-
-build_file = st.file_uploader("Upload Build Sheets PDF", type="pdf")
-ship_file = st.file_uploader("Upload Shipment Pick Lists PDF", type="pdf")
-pickup_flag = st.checkbox("Summarize Customer Pickup orders", value=True)
-
-if build_file and ship_file:
-    build_bytes = build_file.read()
-    ship_bytes = ship_file.read()
-
-    # Procesar ambos PDFs
-    build_pages, build_relations, build_two_day = parse_pdf(build_bytes)
-    ship_pages, ship_relations, ship_two_day = parse_pdf(ship_bytes)
-
-    # Combinar todo
-    original_pages = build_pages + ship_pages
-    all_relations = build_relations + ship_relations
-    all_two_day = build_two_day.union(ship_two_day)
-    all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
-
-    # Mostrar tabla interactiva
-    display_interactive_table(all_relations)
-
-    # Mostrar SH con método 2 day
-    if all_two_day:
-        st.subheader("Órdenes con Shipping Method: 2 day")
-        st.write(", ".join(sorted(all_two_day)))
-    else:
-        st.warning("No se encontraron órdenes con Shipping Method: 2 day")
-
-    if st.button("Generate Merged Output"):
-        build_map = group_by_order(build_pages)
-        ship_map = group_by_order(ship_pages)
-        build_order = get_build_order_list(build_pages)
-
-        # Generar resúmenes
-        summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
-        merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag, all_relations, all_two_day)
-
-        # Insertar resumen al inicio
-        if summary:
-            merged.insert_pdf(summary, start_at=0)
-
-        # Botón de descarga
-        st.download_button(
-            "Download Merged Output PDF",
-            data=merged.tobytes(),
-            file_name="Tequila_Merged_Output.pdf"
-        )
