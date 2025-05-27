@@ -589,7 +589,7 @@ def create_category_table(relations, category_name):
     headers = ["Código", "Descripción", "SH"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
     page.insert_text((200, y), headers[1], fontsize=12, fontname="helv")
-    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv") 
+    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv")  
     y += 20
 
     # Convertir a DataFrame para ordenar por Código
@@ -602,14 +602,14 @@ def create_category_table(relations, category_name):
             # Reinsertar encabezados en nueva página
             page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
             page.insert_text((200, y), headers[1], fontsize=12, fontname="helv")
-            page.insert_text((450, y), headers[2], fontsize=12, fontname="helv") 
+            page.insert_text((450, y), headers[2], fontsize=12, fontname="helv")  
             y += 20
 
         page.insert_text((50, y), row["Código"], fontsize=10)
 
         # Descripción en múltiples líneas si es necesario
         desc = row["Descripción"]
-        if len(desc) > 50: 
+        if len(desc) > 50:  
             page.insert_text((200, y), desc[:50], fontsize=9)
             page.insert_text((200, y + 12), desc[50:], fontsize=9)
             y_offset_for_next_line = 12
@@ -618,9 +618,9 @@ def create_category_table(relations, category_name):
             y_offset_for_next_line = 0
 
         # Agregar el SH
-        page.insert_text((450, y), row["SH"], fontsize=10) 
+        page.insert_text((450, y), row["SH"], fontsize=10)  
 
-        y += 15 + y_offset_for_next_line 
+        y += 15 + y_offset_for_next_line  
 
     return doc
 
@@ -700,9 +700,7 @@ if uploaded_files:
             mime="application/pdf"
         )
         
-        st.subheader("Visualización de Datos Extraídos")
-        st.write("Aquí puedes ver una tabla interactiva de todas las relaciones encontradas:")
+        st.subheader("Visualización de Datos Procesados")
         display_interactive_table(all_relations)
-
     else:
-        st.warning("No se encontraron órdenes o relaciones en los archivos PDF subidos.")
+        st.warning("No se encontraron relaciones de órdenes en los PDFs subidos.")
