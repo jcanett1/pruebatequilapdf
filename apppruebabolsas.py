@@ -287,14 +287,18 @@ PART_DESCRIPTIONS = {
 }
 
 def create_relations_table(relations):
-    """Crea una tabla PDF con cada código en una línea separada, excluyendo pelotas, gorras y accesorios."""
+    """
+    Crea una tabla PDF con cada código en una línea separada,
+    excluyendo pelotas, gorras y accesorios de la lista principal.
+    """
     if not relations:
         return None
     
-    # Filtrar las relaciones para excluir las categorías no deseadas
+    # Filtrar las relaciones para incluir solo los ítems clasificados como "Otros".
+    # Esto elimina pelotas, gorras y accesorios de esta tabla.
     filtered_relations = [
         rel for rel in relations
-        if classify_item(rel["Código"], rel["Descripción"]) == "Otros" # Solo incluir "Otros"
+        if classify_item(rel["Código"], rel["Descripción"]) == "Otros"
     ]
 
     if not filtered_relations:
@@ -303,19 +307,19 @@ def create_relations_table(relations):
         
     df = pd.DataFrame(filtered_relations)
     
-    # Opcional: Ordena para una mejor visualización, por Orden, luego por Código
+    # Ordenar para una mejor visualización, por Orden, luego por Código.
     df = df.sort_values(by=['Orden', 'Código']).reset_index(drop=True)
     
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     y = 50
     
-    # Título
-    title = "RELACIÓN ÓRDENES - CÓDIGOS - SH (Excluyendo Pelotas, Gorras y Accesorios)" # Título ajustado
+    # Título para la tabla, indicando la exclusión.
+    title = "RELACIÓN ÓRDENES - CÓDIGOS - SH (Excluyendo Pelotas, Gorras y Accesorios)"
     page.insert_text((50, y), title, fontsize=16, color=(0, 0, 1), fontname="helv")
     y += 30
     
-    # Encabezados
+    # Encabezados de la tabla.
     headers = ["Orden", "Código", "Descripción", "SH"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
     page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
@@ -323,13 +327,13 @@ def create_relations_table(relations):
     page.insert_text((500, y), headers[3], fontsize=12, fontname="helv")
     y += 20
     
-    current_order = None # Para manejar saltos de orden
+    current_order = None # Variable para detectar cambios de orden y agregar espaciado.
     
     for _, row in df.iterrows():
-        if y > 750: # Si la página está llena, crea una nueva
+        # Si la página está llena, crea una nueva página y reinserta los encabezados.
+        if y > 750:
             page = doc.new_page(width=595, height=842)
             y = 50
-            # Reinsertar encabezados en nueva página
             page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
             page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
             page.insert_text((300, y), headers[2], fontsize=12, fontname="helv")
@@ -338,20 +342,20 @@ def create_relations_table(relations):
             
         order = row['Orden']
         
-        # Inserta la orden si cambia o es la primera fila
+        # Inserta la orden si ha cambiado desde la fila anterior o es la primera fila.
         if order != current_order:
-            if current_order is not None: # Inserta espacio extra si no es la primera orden
+            if current_order is not None: # Agrega un espacio extra si no es la primera orden.
                 y += 10
-            page.insert_text((50, y), order, fontsize=10, fontname="helv", color=(0,0,0.5)) # Orden en negrita y color diferente
+            page.insert_text((50, y), order, fontsize=10, fontname="helv", color=(0,0,0.5)) # Orden en color diferente.
             current_order = order
-            y += 5 # Pequeño espacio después de la orden
+            y += 5 # Pequeño espacio después de la orden.
 
-        # Inserta el código, descripción y SH en la misma línea
-        page.insert_text((150, y), row['Código'], fontsize=10) # Código
-        page.insert_text((300, y), row['Descripción'], fontsize=10) # Descripción
-        page.insert_text((500, y), row['SH'], fontsize=10) # SH
+        # Inserta el código, descripción y SH en la misma línea.
+        page.insert_text((150, y), row['Código'], fontsize=10)
+        page.insert_text((300, y), row['Descripción'], fontsize=10)
+        page.insert_text((500, y), row['SH'], fontsize=10)
         
-        y += 15 # Espacio para la siguiente línea
+        y += 15 # Espacio para la siguiente línea.
             
     return doc
 
