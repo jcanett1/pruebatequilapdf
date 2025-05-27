@@ -21,13 +21,66 @@ def extract_identifiers(text):
     return order_id, shipment_id
 
 def extract_part_numbers(text):
-    """Extrae números de parte con coincidencia exacta"""
+    """
+    Extrae números de parte del texto.
+    Prioritiza las coincidencias más largas y asegura que un número de parte más corto
+    no se cuente si es parte de un número de parte más largo identificado 
+    en la misma posición.
+    Retorna un diccionario con los números de parte encontrados como claves y valor 1.
+    """
     part_counts = {}
     text_upper = text.upper()
-    for part_num in PART_DESCRIPTIONS.keys():
-        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
-        if re.search(pattern, text_upper):
-            part_counts[part_num] = 1
+    
+    # Usamos las claves originales del diccionario PART_DESCRIPTIONS
+    # para determinar qué números de parte estamos buscando.
+    all_part_keys = list(PART_DESCRIPTIONS.keys())
+
+    for p_short in all_part_keys:
+        # Patrón para encontrar p_short como una "palabra completa"
+        # (considerando que '-' no es parte de \w)
+        pattern_short = r'(?<!\w)' + re.escape(p_short) + r'(?!\w)'
+        found_standalone_match_for_p_short = False
+        
+        # Iteramos sobre todas las posibles coincidencias de p_short en el texto
+        for match_short in re.finditer(pattern_short, text_upper):
+            match_short_start_index = match_short.start()
+            is_this_match_shadowed_by_a_longer_one = False
+            
+            # Verificamos si esta coincidencia específica de p_short está "opacada"
+            # por un número de parte más largo (p_long) que también es válido y 
+            # comienza en la misma posición.
+            for p_long in all_part_keys:
+                if len(p_long) > len(p_short) and \
+                   p_short == p_long[:len(p_short)] and \
+                   text_upper.startswith(p_long, match_short_start_index):
+                    
+                    # p_short es un prefijo de p_long, y p_long aparece en el texto
+                    # comenzando en la misma posición que p_short.
+                    # Ahora, verificamos si este p_long es una "palabra completa" válida aquí.
+                    # (es decir, si p_long no está seguido por un carácter de palabra \w)
+                    
+                    end_of_p_long_index = match_short_start_index + len(p_long)
+                    is_p_long_standalone_here = False
+                    if end_of_p_long_index == len(text_upper): # p_long está al final del texto
+                        is_p_long_standalone_here = True
+                    else:
+                        char_after_p_long = text_upper[end_of_p_long_index]
+                        # Si el carácter después de p_long NO es un carácter de palabra (\w)
+                        if not re.match(r'\w', char_after_p_long):
+                            is_p_long_standalone_here = True
+                    
+                    if is_p_long_standalone_here:
+                        is_this_match_shadowed_by_a_longer_one = True
+                        break # Esta coincidencia de p_short está opacada, no necesitamos verificar más p_longs.
+            
+            if not is_this_match_shadowed_by_a_longer_one:
+                # Esta ocurrencia de p_short es independiente (no forma parte de un p_long en esta posición).
+                found_standalone_match_for_p_short = True
+                break # Hemos encontrado una instancia válida de p_short, así que debe incluirse en los resultados.
+        
+        if found_standalone_match_for_p_short:
+            part_counts[p_short] = 1
+            
     return part_counts
 
 def extract_relations(text, order_id, shipment_id):
