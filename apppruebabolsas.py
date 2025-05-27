@@ -359,19 +359,22 @@ def group_codes_by_family(relations):
 
 
 def create_relations_table(relations):
-    """Crea una tabla PDF con códigos agrupados por familia"""
+    """Crea una tabla PDF con cada código en una línea separada."""
     if not relations:
         return None
     
-    # Agrupar por familia
-    df = group_codes_by_family(relations)
+    # Simplemente crea un DataFrame de las relaciones sin agrupar por familia
+    df = pd.DataFrame(relations)
+    
+    # Opcional: Ordena para una mejor visualización, por Orden, luego por Código
+    df = df.sort_values(by=['Orden', 'Código']).reset_index(drop=True)
     
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     y = 50
     
     # Título
-    title = "RELACIÓN ÓRDENES - CÓDIGOS (AGRUPADOS) - SH"
+    title = "RELACIÓN ÓRDENES - CÓDIGOS - SH" # Título ajustado
     page.insert_text((50, y), title, fontsize=16, color=(0, 0, 1), fontname="helv")
     y += 30
     
@@ -383,11 +386,10 @@ def create_relations_table(relations):
     page.insert_text((500, y), headers[3], fontsize=12, fontname="helv")
     y += 20
     
-    current_order = None
-    current_family = None
+    current_order = None # Para manejar saltos de orden
     
     for _, row in df.iterrows():
-        if y > 750:
+        if y > 750: # Si la página está llena, crea una nueva
             page = doc.new_page(width=595, height=842)
             y = 50
             # Reinsertar encabezados en nueva página
@@ -398,43 +400,21 @@ def create_relations_table(relations):
             y += 20
             
         order = row['Orden']
-        family = row['Familia']
-        code = row['Código']
         
-        # Insertar orden si cambia o es la primera fila
+        # Inserta la orden si cambia o es la primera fila
         if order != current_order:
-            if current_order is not None: # Insertar espacio extra si no es la primera orden
+            if current_order is not None: # Inserta espacio extra si no es la primera orden
                 y += 10
             page.insert_text((50, y), order, fontsize=10, fontname="helv-bold", color=(0,0,0.5)) # Orden en negrita y color diferente
             current_order = order
-            # Resetear la familia para la nueva orden
-            current_family = None 
             y += 5 # Pequeño espacio después de la orden
-        
-        # Mostrar familia principal si cambió (dentro de la misma orden)
-        if family != current_family:
-            if code == family: # Si el código es el mismo que la familia, ya está incluido en la línea de la familia
-                page.insert_text((100, y), family, fontsize=10, fontname="helv-bold") # Código de familia en negrita
-                page.insert_text((300, y), PART_DESCRIPTIONS.get(family, "Descripción no disponible"), fontsize=10)
-                page.insert_text((500, y), row['SH'], fontsize=10)
-            else: # Si el código es una variante, la familia principal se escribe primero
-                page.insert_text((100, y), family, fontsize=10, fontname="helv-bold") # Código de familia en negrita
-                page.insert_text((300, y), PART_DESCRIPTIONS.get(family, "Descripción no disponible"), fontsize=10)
-                page.insert_text((500, y), row['SH'], fontsize=10)
-                y += 15 # Espacio para la variante
-                
-                # Insertar la variante indentada
-                page.insert_text((120, y), code, fontsize=10) # Código de la variante
-                page.insert_text((300, y), PART_DESCRIPTIONS.get(code, "Descripción no disponible"), fontsize=10)
-                page.insert_text((500, y), row['SH'], fontsize=10)
 
-            current_family = family
-        elif code != family: # Solo es una variante dentro de la misma orden y familia
-            page.insert_text((120, y), code, fontsize=10) # Código de la variante
-            page.insert_text((300, y), PART_DESCRIPTIONS.get(code, "Descripción no disponible"), fontsize=10)
-            page.insert_text((500, y), row['SH'], fontsize=10)
-            
-        y += 15
+        # Inserta el código, descripción y SH en la misma línea
+        page.insert_text((150, y), row['Código'], fontsize=10) # Código
+        page.insert_text((300, y), row['Descripción'], fontsize=10) # Descripción
+        page.insert_text((500, y), row['SH'], fontsize=10) # SH
+        
+        y += 15 # Espacio para la siguiente línea
             
     return doc
 
