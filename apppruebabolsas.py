@@ -608,20 +608,33 @@ def classify_item(item_code, item_description):
 
 def create_category_table(relations, category_name):
     """
-    Crea una tabla PDF con un listado de códigos y descripciones para una categoría específica.
+    Crea una tabla PDF con un listado de códigos, descripciones y SH para una categoría específica.
     """
-    # Filtrar las relaciones por la categoría deseada
-    # Usamos un set para evitar duplicados en el listado final por Código/Descripción
-    unique_items_in_category = set()
+    unique_items_in_category = {} # Usaremos un diccionario para guardar el primer SH encontrado
     category_data = []
 
     for rel in relations:
         if classify_item(rel["Código"], rel["Descripción"]) == category_name:
-            item_tuple = (rel["Código"], rel["Descripción"])
-            if item_tuple not in unique_items_in_category:
-                unique_items_in_category.add(item_tuple)
-                category_data.append({"Código": rel["Código"], "Descripción": rel["Descripción"]})
+            item_code = rel["Código"]
+            item_description = rel["Descripción"]
+            item_sh = rel["SH"] # Capturamos el SH
 
+            # Si el código ya se ha añadido, no lo volvemos a añadir a unique_items_in_category
+            # pero sí podemos actualizar el SH si queremos el último o el primero.
+            # Por simplicidad, tomaremos el primer SH que encontremos para cada código.
+            if item_code not in unique_items_in_category:
+                unique_items_in_category[item_code] = {
+                    "Descripción": item_description,
+                    "SH": item_sh # Guardamos el SH asociado
+                }
+
+    # Construir category_data a partir del diccionario unique_items_in_category
+    for code, details in unique_items_in_category.items():
+        category_data.append({
+            "Código": code,
+            "Descripción": details["Descripción"],
+            "SH": details["SH"] # Agregamos el SH aquí
+        })
 
     if not category_data:
         return None
@@ -635,10 +648,11 @@ def create_category_table(relations, category_name):
                      fontsize=16, color=(0, 0, 1), fontname="helv")
     y += 30
 
-    # Encabezados
-    headers = ["Código", "Descripción"]
+    # Encabezados - ¡Aquí es donde agregamos 'SH'!
+    headers = ["Código", "Descripción", "SH"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
-    page.insert_text((200, y), headers[1], fontsize=12, fontname="helv") # Ajustar posición para descripción
+    page.insert_text((200, y), headers[1], fontsize=12, fontname="helv")
+    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv") # Ajustar posición para SH
     y += 20
 
     # Convertir a DataFrame para ordenar por Código
@@ -651,6 +665,7 @@ def create_category_table(relations, category_name):
             # Reinsertar encabezados en nueva página
             page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
             page.insert_text((200, y), headers[1], fontsize=12, fontname="helv")
+            page.insert_text((450, y), headers[2], fontsize=12, fontname="helv") # Reinsertar SH
             y += 20
 
         page.insert_text((50, y), row["Código"], fontsize=10)
@@ -660,11 +675,15 @@ def create_category_table(relations, category_name):
         if len(desc) > 50: # Ajustar el límite de caracteres para la descripción
             page.insert_text((200, y), desc[:50], fontsize=9)
             page.insert_text((200, y + 12), desc[50:], fontsize=9)
-            y += 12
+            y_offset_for_next_line = 12
         else:
             page.insert_text((200, y), desc, fontsize=10)
+            y_offset_for_next_line = 0
 
-        y += 15 # Espacio entre filas
+        # Agregar el SH
+        page.insert_text((450, y), row["SH"], fontsize=10) # Posición para el SH
+
+        y += 15 + y_offset_for_next_line # Espacio entre filas, considerando la descripción multilinea
 
     return doc
 
