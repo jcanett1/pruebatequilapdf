@@ -286,6 +286,63 @@ PART_DESCRIPTIONS = {
     # Asegúrate de revisar si hay más guantes o cualquier otro ítem que no haya capturado.
 }
 
+def group_codes_by_family(relations):
+    """
+    Agrupa los códigos de partes por su "familia" (prefijo principal)
+    para la tabla de relaciones.
+    """
+    grouped_data = []
+    
+    # Crea un DataFrame para facilitar la manipulación y el ordenamiento
+    df_relations = pd.DataFrame(relations)
+    
+    # Agrupa por Orden y luego por Código para asegurar un ordenamiento consistente
+    # y para identificar la "familia"
+    for (orden, sh), group in df_relations.groupby(['Orden', 'SH']):
+        # Ordena los códigos dentro de cada grupo para que la familia principal aparezca primero
+        group = group.sort_values(by='Código', key=lambda x: x.apply(lambda y: (len(y), y)))
+        
+        # Identifica la "familia" del primer código (el más corto si hay prefijos)
+        # O si prefieres, puedes tener una lógica más específica para definir la familia
+        first_code = group['Código'].iloc[0]
+        # Una forma simple de obtener la familia es el prefijo común o el código base
+        # Por ejemplo, 'B-PG-172-BGRY' -> 'B-PG-172'
+        family = first_code.split('-')
+        # Si tiene al menos 3 partes (ej. B-PG-172-BGRY), toma las primeras 3 (B-PG-172)
+        # Si es un código más corto (ej. B-PG-172), lo toma completo
+        if len(family) >= 3 and family[0] in ['B', 'H', 'A', 'HC', 'G4', 'GB']: # Asegura que es un prefijo conocido
+            family = "-".join(family[:3])
+            # Verifica si la 'familia' existe como clave en PART_DESCRIPTIONS
+            if family not in PART_DESCRIPTIONS:
+                # Si no existe como clave exacta, usa el código original como familia
+                family = first_code
+        else:
+            family = first_code # Si no cumple el patrón, el código es su propia familia
+
+
+        # Agrega la fila de la "familia" (código base)
+        grouped_data.append({
+            "Orden": orden,
+            "Código": family, # Usamos el código "familia"
+            "Descripción": PART_DESCRIPTIONS.get(family, "Descripción no disponible"),
+            "SH": sh,
+            "Familia": family # Columna para agrupar en el PDF
+        })
+
+        # Agrega las "variantes" si son diferentes a la familia
+        for _, row in group.iterrows():
+            if row['Código'] != family:
+                grouped_data.append({
+                    "Orden": orden, # Orden es el mismo
+                    "Código": row['Código'], # El código completo de la variante
+                    "Descripción": PART_DESCRIPTIONS.get(row['Código'], "Descripción no disponible"),
+                    "SH": sh, # SH es el mismo
+                    "Familia": family # Asigna la misma familia para agrupamiento
+                })
+                
+    return pd.DataFrame(grouped_data).sort_values(by=['Orden', 'Familia', 'Código'])
+
+
 def create_relations_table(relations):
     """Crea una tabla PDF con códigos agrupados por familia"""
     if not relations:
