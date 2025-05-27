@@ -375,6 +375,23 @@ def create_2day_shipping_page(two_day_sh_list):
     
     return doc
 
+def display_interactive_table(relations):
+    """
+    Muestra una tabla interactiva de relaciones en Streamlit.
+    """
+    if not relations:
+        st.info("No se encontraron relaciones para mostrar en la tabla interactiva.")
+        return
+
+    df = pd.DataFrame(relations)
+
+    st.subheader("Tabla Interactiva de Relaciones (Órdenes, Códigos, SH)")
+    
+    # Using st.dataframe for a simple interactive table
+    st.dataframe(df)
+
+
+
 def create_summary_page(order_data, build_keys, shipment_keys, pickup_flag):
     all_orders = set(build_keys) | set(shipment_keys)
     unmatched_build = set(build_keys) - set(shipment_keys)
