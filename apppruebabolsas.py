@@ -634,44 +634,56 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
 
-    # 1. Insertar tabla de relaciones (con agrupamiento por familia)
-    relations_table = create_relations_table(all_relations)
+    # --- NUEVO: Filtrar all_relations para la tabla principal (solo Bolsas) ---
+    bags_relations = [
+        rel for rel in all_relations
+        if classify_item(rel["Código"], rel["Descripción"]) == "Bolsas"
+    ]
+
+    # 1. Insertar tabla de relaciones (solo Bolsas)
+    relations_table = create_relations_table(bags_relations) # Pass only bags_relations here
     if relations_table:
         doc.insert_pdf(relations_table)
-        insert_divider_page(doc, "Resumen de Partes") # Separador
+        insert_divider_page(doc, "RELACIÓN ÓRDENES - CÓDIGOS - BOLSAS") # Updated label to be more specific
 
     # 2. Insertar página de SH 2 day
     two_day_page = create_2day_shipping_page(all_two_day)
     if two_day_page:
         doc.insert_pdf(two_day_page)
-        insert_divider_page(doc, "Resumen de Apariciones de Partes") # Separador
+        insert_divider_page(doc, "SHIPPING 2 DAY") # Separador para la siguiente sección
 
-    # 3. Insertar resumen de apariciones de partes
+    # 3. Insertar resumen de apariciones de partes (este incluye todo)
     part_summary = create_part_numbers_summary(order_meta)
     if part_summary:
         doc.insert_pdf(part_summary)
-        insert_divider_page(doc, "Listado de Pelotas") # Separador
+        insert_divider_page(doc, "RESUMEN DE APARICIONES DE PARTES") # Separador para la siguiente sección
 
     # --- NUEVA SECCIÓN: Páginas por Categoría ---
     # 4. Insertar página de Pelotas
     pelotas_doc = create_category_table(all_relations, "Pelotas")
     if pelotas_doc:
         doc.insert_pdf(pelotas_doc)
-        insert_divider_page(doc, "Listado de Gorras") # Separador para la siguiente categoría
+        insert_divider_page(doc, "LISTADO DE PELOTAS") # Separador para la siguiente categoría
 
     # 5. Insertar página de Gorras
     gorras_doc = create_category_table(all_relations, "Gorras")
     if gorras_doc:
         doc.insert_pdf(gorras_doc)
-        insert_divider_page(doc, "Listado de Accesorios") # Separador para la siguiente categoría
+        insert_divider_page(doc, "LISTADO DE GORRAS") # Separador para la siguiente categoría
 
     # 6. Insertar página de Accesorios
     accesorios_doc = create_category_table(all_relations, "Accesorios")
     if accesorios_doc:
         doc.insert_pdf(accesorios_doc)
-        insert_divider_page(doc, "Documentos Principales") # Separador antes de los docs originales
+        insert_divider_page(doc, "LISTADO DE ACCESORIOS") # Separador para la siguiente categoría
 
-    # Insertar páginas de órdenes
+    # Insertar la página de resumen general
+    summary_doc = create_summary_page(order_meta, build_map.keys(), ship_map.keys(), pickup_flag)
+    if summary_doc:
+        doc.insert_pdf(summary_doc)
+        insert_divider_page(doc, "RESUMEN GENERAL DE ÓRDENES") # Separador
+
+    # 7. Insertar páginas de órdenes originales (Build y Ship)
     def insert_order_pages(order_list):
         for oid in order_list:
             # Insertar build pages
@@ -686,64 +698,108 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
 
     # Insertar pickups primero si está habilitado
     if pickup_flag and pickups:
-        insert_divider_page(doc, "Customer Pickup Orders")
+        insert_divider_page(doc, "ÓRDENES DE RECOGIDA POR CLIENTE")
         insert_order_pages(pickups)
 
     # Insertar otras órdenes
     others = [oid for oid in build_order if oid not in pickups]
     if others:
-        insert_divider_page(doc, "Other Orders")
+        insert_divider_page(doc, "OTRAS ÓRDENES")
         insert_order_pages(others)
 
     return doc
 
 # === Interfaz de Streamlit ===
-st.title("Tequila Build/Shipment PDF Processor")
+st.title("Procesador de PDFs de Órdenes")
 
-build_file = st.file_uploader("Upload Build Sheets PDF", type="pdf")
-ship_file = st.file_uploader("Upload Shipment Pick Lists PDF", type="pdf")
-pickup_flag = st.checkbox("Summarize Customer Pickup orders", value=True)
+uploaded_files = st.file_uploader("Sube tus archivos PDF de órdenes aquí", type="pdf", accept_multiple_files=True)
+pickup_flag = st.checkbox("Resumir órdenes de recogida por cliente", value=True)
 
-if build_file and ship_file:
-    build_bytes = build_file.read()
-    ship_bytes = ship_file.read()
+if uploaded_files:
+    all_relations = []
+    all_two_day_sh = set()
+    all_pages_data = [] # Para el resumen de partes
 
-    # Procesar ambos PDFs
-    build_pages, build_relations, build_two_day = parse_pdf(build_bytes)
-    ship_pages, ship_relations, ship_two_day = parse_pdf(ship_bytes)
+    # Separate build and ship files based on keywords in their content
+    build_files = []
+    ship_files = []
 
-    # Combinar todo
-    original_pages = build_pages + ship_pages
-    all_relations = build_relations + ship_relations
-    all_two_day = build_two_day.union(ship_two_day)
-    all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
+    for uploaded_file in uploaded_files:
+        pdf_bytes = uploaded_file.read()
+        doc_temp = fitz.open(stream=pdf_bytes, filetype="pdf")
+        
+        # Read a small part of the first page to check for keywords
+        first_page_text = ""
+        if len(doc_temp) > 0:
+            first_page_text = doc_temp.load_page(0).get_text("text")
 
-    # Mostrar tabla interactiva
-    display_interactive_table(all_relations)
+        if "BUILD SHEET" in first_page_text.upper():
+            build_files.append(pdf_bytes)
+        elif "SHIPMENT PICK LIST" in first_page_text.upper():
+            ship_files.append(pdf_bytes)
+        else:
+            # If neither, you might want to handle this case, e.g., print a warning
+            st.warning(f"File '{uploaded_file.name}' not identified as Build Sheet or Shipment Pick List. Skipping.")
+        
+        doc_temp.close() # Close temporary doc
 
-    # Mostrar SH con método 2 day
-    if all_two_day:
-        st.subheader("Órdenes con Shipping Method: 2 day")
-        st.write(", ".join(sorted(all_two_day)))
+    if not build_files and not ship_files:
+        st.error("No se encontraron archivos PDF válidos de 'Build Sheet' o 'Shipment Pick List'.")
+    elif not build_files:
+        st.warning("No se encontraron archivos 'Build Sheet' entre los subidos.")
+    elif not ship_files:
+        st.warning("No se encontraron archivos 'Shipment Pick List' entre los subidos.")
     else:
-        st.warning("No se encontraron órdenes con Shipping Method: 2 day")
+        st.success(f"Archivos procesados: {len(build_files)} Build Sheets, {len(ship_files)} Shipment Pick Lists.")
 
-    if st.button("Generate Merged Output"):
-        build_map = group_by_order(build_pages)
-        ship_map = group_by_order(ship_pages)
-        build_order = get_build_order_list(build_pages)
+        # Process build files
+        build_pages_list = []
+        build_relations_list = []
+        build_two_day_list = set()
+        for pdf_bytes in build_files:
+            pages_data, relations, two_day_sh = parse_pdf(pdf_bytes)
+            build_pages_list.extend(pages_data)
+            build_relations_list.extend(relations)
+            build_two_day_list.update(two_day_sh)
 
-        # Generar resúmenes
-        summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
-        merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag, all_relations, all_two_day)
+        # Process ship files
+        ship_pages_list = []
+        ship_relations_list = []
+        ship_two_day_list = set()
+        for pdf_bytes in ship_files:
+            pages_data, relations, two_day_sh = parse_pdf(pdf_bytes)
+            ship_pages_list.extend(pages_data)
+            ship_relations_list.extend(relations)
+            ship_two_day_list.update(two_day_sh)
 
-        # Insertar resumen al inicio
-        if summary:
-            merged.insert_pdf(summary, start_at=0)
+        # Combine all data
+        all_pages_data = build_pages_list + ship_pages_list
+        all_relations = build_relations_list + ship_relations_list
+        all_two_day = build_two_day_list.union(ship_two_day_list)
 
-        # Botón de descarga
-        st.download_button(
-            "Download Merged Output PDF",
-            data=merged.tobytes(),
-            file_name="Tequila_Merged_Output.pdf"
-        )
+        # Prepare maps and lists for merge_documents
+        build_map = group_by_order(build_pages_list)
+        ship_map = group_by_order(ship_pages_list)
+        order_meta = group_by_order(all_pages_data, classify_pickup=pickup_flag)
+        build_order_list = get_build_order_list(build_pages_list)
+
+        # Display interactive table (still for all relations)
+        if all_relations:
+            display_interactive_table(all_relations)
+
+        # Display SH with 2-day shipping
+        if all_two_day:
+            st.subheader("Órdenes con Shipping Method: 2 day")
+            st.write(", ".join(sorted(all_two_day)))
+        else:
+            st.warning("No se encontraron órdenes con Shipping Method: 2 day")
+
+        if st.button("Generar PDF Consolidado"):
+            merged = merge_documents(build_order_list, build_map, ship_map, order_meta, pickup_flag, all_relations, all_two_day)
+
+            st.download_button(
+                label="Descargar PDF Consolidado",
+                data=merged.tobytes(),
+                file_name="reporte_ordenes_consolidado.pdf",
+                mime="application/pdf"
+            )
