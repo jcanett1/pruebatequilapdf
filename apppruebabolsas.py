@@ -100,6 +100,51 @@ def extract_relations(text, order_id, shipment_id):
     return relations
 
 
+def parse_pdf(pdf_bytes):
+    """
+    Parses a PDF file, extracts relevant information, and returns it.
+
+    Args:
+        pdf_bytes: The content of the PDF file as bytes.
+
+    Returns:
+        A tuple containing:
+        - A list of dictionaries, where each dictionary represents a page and contains
+          the extracted information (order_id, shipment_id, part_numbers, text).
+        - A list of relations (dictionaries) between order_id, part_num, description, and shipment_id.
+        - A set of shipment IDs with "2 day" shipping.
+    """
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    all_pages_data = []
+    all_relations = []
+    two_day_sh_list = set()
+
+    for page_num in range(len(doc)):
+        page = doc.load_page(page_num)
+        text = page.get_text("text")
+        order_id, shipment_id = extract_identifiers(text)
+        part_numbers = extract_part_numbers(text)
+
+        if shipment_id and SHIPPING_2DAY_REGEX.search(text):
+            two_day_sh_list.add(shipment_id)
+
+        page_data = {
+            "number": page_num,
+            "order_id": order_id,
+            "shipment_id": shipment_id,
+            "part_numbers": part_numbers,
+            "text": text,
+            "parent": doc,  # Add the document object
+        }
+        all_pages_data.append(page_data)
+
+        # Extract relations for this page
+        if order_id and shipment_id:
+            page_relations = extract_relations(text, order_id, shipment_id)
+            all_relations.extend(page_relations)
+
+    return all_pages_data, all_relations, two_day_sh_list
+
 # === Definición CORRECTA y COMPLETA de partes (diccionario) ===
 PART_DESCRIPTIONS = {
     'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
