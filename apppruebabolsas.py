@@ -174,7 +174,7 @@ PART_DESCRIPTIONS = {
     'B-UGB8-EP': '2020 Carry Stand Bag - Black',
 
     # --- CÓDIGOS DE LAS IMÁGENES ---
-   # image_fbd711.png (Golf Balls)
+    # image_fbd711.png (Golf Balls)
     'GB-DOZ-XTREME': 'Xtreme Golf Ball - Dozen',
     'GB-DOZ-XTTR-WHT': 'Xtreme Tour Golf Ball - White - Dozen',
     'GB-DOZ-XTTR-YEL': 'Xtreme Tour Golf Ball - Yellow - Dozen',
@@ -307,18 +307,33 @@ def group_codes_by_family(relations):
         first_code = group['Código'].iloc[0]
         # Una forma simple de obtener la familia es el prefijo común o el código base
         # Por ejemplo, 'B-PG-172-BGRY' -> 'B-PG-172'
-        family = first_code.split('-')
-        # Si tiene al menos 3 partes (ej. B-PG-172-BGRY), toma las primeras 3 (B-PG-172)
-        # Si es un código más corto (ej. B-PG-172), lo toma completo
-        if len(family) >= 3 and family[0] in ['B', 'H', 'A', 'HC', 'G4', 'GB']: # Asegura que es un prefijo conocido
-            family = "-".join(family[:3])
-            # Verifica si la 'familia' existe como clave en PART_DESCRIPTIONS
-            if family not in PART_DESCRIPTIONS:
-                # Si no existe como clave exacta, usa el código original como familia
-                family = first_code
+        family_parts = first_code.split('-')
+        
+        # Determinar la familia basándose en el tipo de código
+        if family_parts[0] == 'B' and len(family_parts) >= 3:
+            family = "-".join(family_parts[:3])
+        elif family_parts[0] in ['H', 'A', 'HC', 'G4', 'GB']:
+            # Para estos prefijos, el código base puede ser el prefijo y los siguientes 2 o 3 componentes
+            # Dependiendo de la especificidad deseada. Por ahora, tomamos el código completo como familia
+            # Si se desea agrupar 'H-23PXG000166-BLK-OSFM' con 'H-23PXG000166-WHT-OSFM',
+            # la familia podría ser 'H-23PXG000166'.
+            # Para este ejemplo, simplificaremos a tomar el código completo como familia.
+            family = first_code
         else:
             family = first_code # Si no cumple el patrón, el código es su propia familia
 
+        # Si la "familia" identificada no tiene una descripción exacta en PART_DESCRIPTIONS,
+        # intentamos simplificarla aún más para encontrar una descripción base.
+        if family not in PART_DESCRIPTIONS and len(family_parts) > 1:
+            if family_parts[0] == 'H' and len(family_parts) > 2: # Ej: H-23PXG000166-BLK-OSFM -> H-23PXG000166
+                potential_family = "-".join(family_parts[:3])
+                if potential_family in PART_DESCRIPTIONS:
+                    family = potential_family
+            elif family_parts[0] == 'B' and len(family_parts) > 2: # Ej: B-PG-172-BGRY -> B-PG-172
+                 potential_family = "-".join(family_parts[:3])
+                 if potential_family in PART_DESCRIPTIONS:
+                     family = potential_family
+            # Añade más reglas si es necesario para otros prefijos
 
         # Agrega la fila de la "familia" (código base)
         grouped_data.append({
@@ -368,6 +383,7 @@ def create_relations_table(relations):
     page.insert_text((500, y), headers[3], fontsize=12, fontname="helv")
     y += 20
     
+    current_order = None
     current_family = None
     
     for _, row in df.iterrows():
@@ -381,27 +397,45 @@ def create_relations_table(relations):
             page.insert_text((500, y), headers[3], fontsize=12, fontname="helv")
             y += 20
             
+        order = row['Orden']
         family = row['Familia']
         code = row['Código']
         
-        # Mostrar familia principal si cambió
-        if family != current_family:
-            page.insert_text((50, y), row['Orden'], fontsize=10)
-            # ! IMPORTANTE: Aquí se corrige la fuente a "Helvetica-Bold"
-            page.insert_text((150, y), family, fontsize=10, fontname="Helvetica-Bold")
-            page.insert_text((300, y), PART_DESCRIPTIONS.get(family, ""), fontsize=10)
-            page.insert_text((500, y), row['SH'], fontsize=10)
-            y += 15
-            current_family = family
+        # Insertar orden si cambia o es la primera fila
+        if order != current_order:
+            if current_order is not None: # Insertar espacio extra si no es la primera orden
+                y += 10
+            page.insert_text((50, y), order, fontsize=10, fontname="helv-bold", color=(0,0,0.5)) # Orden en negrita y color diferente
+            current_order = order
+            # Resetear la familia para la nueva orden
+            current_family = None 
+            y += 5 # Pequeño espacio después de la orden
         
-        # Mostrar variante si es diferente a la familia base
-        if code != family:
-            page.insert_text((50, y), "", fontsize=10)  # Dejar orden en blanco
-            page.insert_text((150, y), "  " + code.replace(family + '-', ''), fontsize=10)
-            page.insert_text((300, y), PART_DESCRIPTIONS.get(code, ""), fontsize=10)
+        # Mostrar familia principal si cambió (dentro de la misma orden)
+        if family != current_family:
+            if code == family: # Si el código es el mismo que la familia, ya está incluido en la línea de la familia
+                page.insert_text((100, y), family, fontsize=10, fontname="helv-bold") # Código de familia en negrita
+                page.insert_text((300, y), PART_DESCRIPTIONS.get(family, "Descripción no disponible"), fontsize=10)
+                page.insert_text((500, y), row['SH'], fontsize=10)
+            else: # Si el código es una variante, la familia principal se escribe primero
+                page.insert_text((100, y), family, fontsize=10, fontname="helv-bold") # Código de familia en negrita
+                page.insert_text((300, y), PART_DESCRIPTIONS.get(family, "Descripción no disponible"), fontsize=10)
+                page.insert_text((500, y), row['SH'], fontsize=10)
+                y += 15 # Espacio para la variante
+                
+                # Insertar la variante indentada
+                page.insert_text((120, y), code, fontsize=10) # Código de la variante
+                page.insert_text((300, y), PART_DESCRIPTIONS.get(code, "Descripción no disponible"), fontsize=10)
+                page.insert_text((500, y), row['SH'], fontsize=10)
+
+            current_family = family
+        elif code != family: # Solo es una variante dentro de la misma orden y familia
+            page.insert_text((120, y), code, fontsize=10) # Código de la variante
+            page.insert_text((300, y), PART_DESCRIPTIONS.get(code, "Descripción no disponible"), fontsize=10)
             page.insert_text((500, y), row['SH'], fontsize=10)
-            y += 15
-    
+            
+        y += 15
+            
     return doc
 
 # === Nueva función para crear página de SH 2 day ===
@@ -593,16 +627,21 @@ def insert_divider_page(doc, label):
 # --- NUEVAS FUNCIONES PARA CLASIFICAR Y GENERAR PDFs POR CATEGORÍA ---
 
 def classify_item(item_code, item_description):
-    """Clasifica un ítem en 'Pelotas', 'Gorras', 'Accesorios'."""
+    """Clasifica un ítem en 'Bolsas', 'Pelotas', 'Gorras', 'Accesorios'."""
     item_code_upper = item_code.upper()
     item_description_upper = item_description.upper()
 
-    if item_code_upper.startswith('GB-DOZ-') or "GOLF BALL" in item_description_upper:
+    # Bolsas
+    if item_code_upper.startswith('B-PG-') or "BAG" in item_description_upper:
+        return "Bolsas"
+    # Pelotas
+    elif item_code_upper.startswith('GB-DOZ-') or "GOLF BALL" in item_description_upper:
         return "Pelotas"
-    elif item_code_upper.startswith('H-') or ("HAT" in item_description_upper or "CAP" in item_description_upper):
+    # Gorras
+    elif item_code_upper.startswith('H-') or ("HAT" in item_description_upper or "CAP" in item_description_upper or "VISOR" in item_description_upper):
         return "Gorras"
-    # Accesorios - Si no es pelota ni gorra, y empieza con A- o HC- o G4- (guantes)
-    elif item_code_upper.startswith(('A-', 'HC-', 'G4-')):
+    # Accesorios (incluye guantes si G4- son accesorios)
+    elif item_code_upper.startswith(('A-', 'HC-', 'G4-')) or "TOOL" in item_description_upper or "BRUSH" in item_description_upper or "MARKER" in item_description_upper or "COVER" in item_description_upper or "GLOVE" in item_description_upper:
         return "Accesorios"
     return "Otros" # Para ítems que no encajan en ninguna categoría definida
 
@@ -610,33 +649,21 @@ def create_category_table(relations, category_name):
     """
     Crea una tabla PDF con un listado de códigos, descripciones y SH para una categoría específica.
     """
-    unique_items_in_category = {} # Usaremos un diccionario para guardar el primer SH encontrado
-    category_data = []
-
+    category_items = {} # Usaremos un diccionario para asegurar la unicidad y mantener el primer SH
+    
     for rel in relations:
         if classify_item(rel["Código"], rel["Descripción"]) == category_name:
             item_code = rel["Código"]
-            item_description = rel["Descripción"]
-            item_sh = rel["SH"] # Capturamos el SH
-
-            # Si el código ya se ha añadido, no lo volvemos a añadir a unique_items_in_category
-            # pero sí podemos actualizar el SH si queremos el último o el primero.
-            # Por simplicidad, tomaremos el primer SH que encontremos para cada código.
-            if item_code not in unique_items_in_category:
-                unique_items_in_category[item_code] = {
-                    "Descripción": item_description,
-                    "SH": item_sh # Guardamos el SH asociado
+            if item_code not in category_items: # Si el código no está, lo añadimos con su SH
+                category_items[item_code] = {
+                    "Descripción": rel["Descripción"],
+                    "SH": rel["SH"]
                 }
-
-    # Construir category_data a partir del diccionario unique_items_in_category
-    for code, details in unique_items_in_category.items():
-        category_data.append({
-            "Código": code,
-            "Descripción": details["Descripción"],
-            "SH": details["SH"] # Agregamos el SH aquí
-        })
-
-    if not category_data:
+            # Si ya existe, no hacemos nada, conservamos el primer SH encontrado para ese código
+            # Si quisieras el último SH, sería category_items[item_code]["SH"] = rel["SH"]
+            # Si quisieras una lista de todos los SH por código, la estructura de category_items sería diferente
+    
+    if not category_items:
         return None
 
     doc = fitz.open()
@@ -648,15 +675,15 @@ def create_category_table(relations, category_name):
                      fontsize=16, color=(0, 0, 1), fontname="helv")
     y += 30
 
-    # Encabezados - ¡Aquí es donde agregamos 'SH'!
+    # Encabezados
     headers = ["Código", "Descripción", "SH"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
     page.insert_text((200, y), headers[1], fontsize=12, fontname="helv")
-    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv") # Ajustar posición para SH
+    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv") 
     y += 20
 
     # Convertir a DataFrame para ordenar por Código
-    df_category = pd.DataFrame(category_data).sort_values(by=["Código"])
+    df_category = pd.DataFrame([{"Código": code, **details} for code, details in category_items.items()]).sort_values(by=["Código"])
 
     for _, row in df_category.iterrows():
         if y > 750:
@@ -665,14 +692,14 @@ def create_category_table(relations, category_name):
             # Reinsertar encabezados en nueva página
             page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
             page.insert_text((200, y), headers[1], fontsize=12, fontname="helv")
-            page.insert_text((450, y), headers[2], fontsize=12, fontname="helv") # Reinsertar SH
+            page.insert_text((450, y), headers[2], fontsize=12, fontname="helv") 
             y += 20
 
         page.insert_text((50, y), row["Código"], fontsize=10)
 
         # Descripción en múltiples líneas si es necesario
         desc = row["Descripción"]
-        if len(desc) > 50: # Ajustar el límite de caracteres para la descripción
+        if len(desc) > 50: 
             page.insert_text((200, y), desc[:50], fontsize=9)
             page.insert_text((200, y + 12), desc[50:], fontsize=9)
             y_offset_for_next_line = 12
@@ -681,9 +708,9 @@ def create_category_table(relations, category_name):
             y_offset_for_next_line = 0
 
         # Agregar el SH
-        page.insert_text((450, y), row["SH"], fontsize=10) # Posición para el SH
+        page.insert_text((450, y), row["SH"], fontsize=10) 
 
-        y += 15 + y_offset_for_next_line # Espacio entre filas, considerando la descripción multilinea
+        y += 15 + y_offset_for_next_line 
 
     return doc
 
@@ -696,112 +723,76 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
     relations_table = create_relations_table(all_relations)
     if relations_table:
         doc.insert_pdf(relations_table)
-        insert_divider_page(doc, "Resumen de Partes") # Separador
+        insert_divider_page(doc, "Resumen de Órdenes y Productos") # PÁGINA DIVISORA
 
-    # 2. Insertar página de SH 2 day
-    two_day_page = create_2day_shipping_page(all_two_day)
-    if two_day_page:
-        doc.insert_pdf(two_day_page)
-        insert_divider_page(doc, "Resumen de Apariciones de Partes") # Separador
+    # 2. Insertar tablas por categoría
+    categories = ["Bolsas", "Pelotas", "Gorras", "Accesorios"]
+    for category in categories:
+        category_table_doc = create_category_table(all_relations, category)
+        if category_table_doc:
+            insert_divider_page(doc, f"Listado de {category}") # PÁGINA DIVISORA ANTES DE CADA CATEGORÍA
+            doc.insert_pdf(category_table_doc)
 
-    # 3. Insertar resumen de apariciones de partes
-    part_summary = create_part_numbers_summary(order_meta)
-    if part_summary:
-        doc.insert_pdf(part_summary)
-        insert_divider_page(doc, "Listado de Pelotas") # Separador
+    # 3. Insertar la página de SH 2 day
+    two_day_doc = create_2day_shipping_page(all_two_day)
+    if two_day_doc:
+        insert_divider_page(doc, "Shipping 2 Day") # PÁGINA DIVISORA
+        doc.insert_pdf(two_day_doc)
 
-    # --- NUEVA SECCIÓN: Páginas por Categoría ---
-    # 4. Insertar página de Pelotas
-    pelotas_doc = create_category_table(all_relations, "Pelotas")
-    if pelotas_doc:
-        doc.insert_pdf(pelotas_doc)
-        insert_divider_page(doc, "Listado de Gorras") # Separador para la siguiente categoría
+    # 4. Insertar la página de resumen (si es relevante)
+    summary_doc = create_summary_page(order_meta, build_map.keys(), ship_map.keys(), pickup_flag)
+    if summary_doc:
+        insert_divider_page(doc, "Resumen General") # PÁGINA DIVISORA
+        doc.insert_pdf(summary_doc)
 
-    # 5. Insertar página de Gorras
-    gorras_doc = create_category_table(all_relations, "Gorras")
-    if gorras_doc:
-        doc.insert_pdf(gorras_doc)
-        insert_divider_page(doc, "Listado de Accesorios") # Separador para la siguiente categoría
-
-    # 6. Insertar página de Accesorios
-    accesorios_doc = create_category_table(all_relations, "Accesorios")
-    if accesorios_doc:
-        doc.insert_pdf(accesorios_doc)
-        insert_divider_page(doc, "Documentos Principales") # Separador antes de los docs originales
-
-    # Insertar páginas de órdenes
-    def insert_order_pages(order_list):
-        for oid in order_list:
-            # Insertar build pages
-            for p in build_map.get(oid, {}).get("pages", []):
-                src_page = p["parent"][p["number"]]
-                doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
-            
-            # Insertar ship pages
-            for p in ship_map.get(oid, {}).get("pages", []):
-                src_page = p["parent"][p["number"]]
-                doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
-
-    # Insertar pickups primero si está habilitado
-    if pickup_flag and pickups:
-        insert_divider_page(doc, "Customer Pickup Orders")
-        insert_order_pages(pickups)
-
-    # Insertar otras órdenes
-    others = [oid for oid in build_order if oid not in pickups]
-    if others:
-        insert_divider_page(doc, "Other Orders")
-        insert_order_pages(others)
+    # 5. Insertar el resumen de apariciones de partes (si es relevante)
+    parts_summary_doc = create_part_numbers_summary(order_meta)
+    if parts_summary_doc:
+        insert_divider_page(doc, "Resumen de Apariciones de Partes") # PÁGINA DIVISORA
+        doc.insert_pdf(parts_summary_doc)
 
     return doc
 
-# === Interfaz de Streamlit ===
-st.title("Tequila Build/Shipment PDF Processor")
+# --- Streamlit UI ---
+st.title("Procesador de PDFs de Órdenes")
 
-build_file = st.file_uploader("Upload Build Sheets PDF", type="pdf")
-ship_file = st.file_uploader("Upload Shipment Pick Lists PDF", type="pdf")
-pickup_flag = st.checkbox("Summarize Customer Pickup orders", value=True)
+uploaded_files = st.file_uploader("Sube tus archivos PDF de órdenes aquí", type="pdf", accept_multiple_files=True)
 
-if build_file and ship_file:
-    build_bytes = build_file.read()
-    ship_bytes = ship_file.read()
+if uploaded_files:
+    all_relations = []
+    all_two_day_sh = set()
+    all_pages_data = [] # Para el resumen de partes
 
-    # Procesar ambos PDFs
-    build_pages, build_relations, build_two_day = parse_pdf(build_bytes)
-    ship_pages, ship_relations, ship_two_day = parse_pdf(ship_bytes)
+    for uploaded_file in uploaded_files:
+        pdf_bytes = uploaded_file.read()
+        pages_data, relations, two_day_sh = parse_pdf(pdf_bytes)
+        
+        all_pages_data.extend(pages_data)
+        all_relations.extend(relations)
+        all_two_day_sh.update(two_day_sh)
 
-    # Combinar todo
-    original_pages = build_pages + ship_pages
-    all_relations = build_relations + ship_relations
-    all_two_day = build_two_day.union(ship_two_day)
-    all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
+    if all_relations:
+        st.success(f"Se procesaron {len(uploaded_files)} archivo(s) PDF.")
+        
+        # Preparar datos para las funciones de resumen
+        build_map = group_by_order([p for p in all_pages_data if 'Build' in p.get('text', '')])
+        ship_map = group_by_order([p for p in all_pages_data if 'Shipment' in p.get('text', '')])
+        order_meta = group_by_order(all_pages_data, classify_pickup=True)
+        build_order_list = get_build_order_list(all_pages_data) # O podrías pasar build_map.keys()
 
-    # Mostrar tabla interactiva
-    display_interactive_table(all_relations)
-
-    # Mostrar SH con método 2 day
-    if all_two_day:
-        st.subheader("Órdenes con Shipping Method: 2 day")
-        st.write(", ".join(sorted(all_two_day)))
-    else:
-        st.warning("No se encontraron órdenes con Shipping Method: 2 day")
-
-    if st.button("Generate Merged Output"):
-        build_map = group_by_order(build_pages)
-        ship_map = group_by_order(ship_pages)
-        build_order = get_build_order_list(build_pages)
-
-        # Generar resúmenes
-        summary = create_summary_page(all_meta, build_map.keys(), ship_map.keys(), pickup_flag)
-        merged = merge_documents(build_order, build_map, ship_map, all_meta, pickup_flag, all_relations, all_two_day)
-
-        # Insertar resumen al inicio
-        if summary:
-            merged.insert_pdf(summary, start_at=0)
-
-        # Botón de descarga
+        # Generar el PDF consolidado
+        final_pdf = merge_documents(build_order_list, build_map, ship_map, order_meta, True, all_relations, all_two_day_sh)
+        
         st.download_button(
-            "Download Merged Output PDF",
-            data=merged.tobytes(),
-            file_name="Tequila_Merged_Output.pdf"
+            label="Descargar PDF Consolidado",
+            data=final_pdf.tobytes(),
+            file_name="reporte_ordenes_consolidado.pdf",
+            mime="application/pdf"
         )
+        
+        st.subheader("Visualización de Datos Extraídos")
+        st.write("Aquí puedes ver una tabla interactiva de todas las relaciones encontradas:")
+        display_interactive_table(all_relations)
+
+    else:
+        st.warning("No se encontraron órdenes o relaciones en los archivos PDF subidos.")
