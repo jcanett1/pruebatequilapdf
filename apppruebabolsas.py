@@ -287,12 +287,21 @@ PART_DESCRIPTIONS = {
 }
 
 def create_relations_table(relations):
-    """Crea una tabla PDF con cada código en una línea separada."""
+    """Crea una tabla PDF con cada código en una línea separada, excluyendo pelotas, gorras y accesorios."""
     if not relations:
         return None
     
-    # Simplemente crea un DataFrame de las relaciones sin agrupar por familia
-    df = pd.DataFrame(relations)
+    # Filtrar las relaciones para excluir las categorías no deseadas
+    filtered_relations = [
+        rel for rel in relations
+        if classify_item(rel["Código"], rel["Descripción"]) == "Otros" # Solo incluir "Otros"
+    ]
+
+    if not filtered_relations:
+        st.info("No se encontraron relaciones de 'Otros' productos para mostrar en la tabla principal.")
+        return None
+        
+    df = pd.DataFrame(filtered_relations)
     
     # Opcional: Ordena para una mejor visualización, por Orden, luego por Código
     df = df.sort_values(by=['Orden', 'Código']).reset_index(drop=True)
@@ -302,7 +311,7 @@ def create_relations_table(relations):
     y = 50
     
     # Título
-    title = "RELACIÓN ÓRDENES - CÓDIGOS - SH" # Título ajustado
+    title = "RELACIÓN ÓRDENES - CÓDIGOS - SH (Excluyendo Pelotas, Gorras y Accesorios)" # Título ajustado
     page.insert_text((50, y), title, fontsize=16, color=(0, 0, 1), fontname="helv")
     y += 30
     
