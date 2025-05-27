@@ -286,77 +286,23 @@ PART_DESCRIPTIONS = {
     # Asegúrate de revisar si hay más guantes o cualquier otro ítem que no haya capturado.
 }
 
-def group_codes_by_family(relations):
-    """
-    Agrupa los códigos de partes por su "familia" (prefijo principal)
-    para la tabla de relaciones.
-    """
-    grouped_data = []
-    
-    # Crea un DataFrame para facilitar la manipulación y el ordenamiento
-    df_relations = pd.DataFrame(relations)
-    
-    # Agrupa por Orden y luego por Código para asegurar un ordenamiento consistente
-    # y para identificar la "familia"
-    for (orden, sh), group in df_relations.groupby(['Orden', 'SH']):
-        # Ordena los códigos dentro de cada grupo para que la familia principal aparezca primero
-        group = group.sort_values(by='Código', key=lambda x: x.apply(lambda y: (len(y), y)))
-        
-        # Identifica la "familia" del primer código (el más corto si hay prefijos)
-        # O si prefieres, puedes tener una lógica más específica para definir la familia
-        first_code = group['Código'].iloc[0]
-        # Una forma simple de obtener la familia es el prefijo común o el código base
-        # Por ejemplo, 'B-PG-172-BGRY' -> 'B-PG-172'
-        family = first_code.split('-')
-        # Si tiene al menos 3 partes (ej. B-PG-172-BGRY), toma las primeras 3 (B-PG-172)
-        # Si es un código más corto (ej. B-PG-172), lo toma completo
-        if len(family) >= 3 and family[0] in ['B', 'H', 'A', 'HC', 'G4', 'GB']: # Asegura que es un prefijo conocido
-            family = "-".join(family[:3])
-            # Verifica si la 'familia' existe como clave en PART_DESCRIPTIONS
-            if family not in PART_DESCRIPTIONS:
-                # Si no existe como clave exacta, usa el código original como familia
-                family = first_code
-        else:
-            family = first_code # Si no cumple el patrón, el código es su propia familia
-
-
-        # Agrega la fila de la "familia" (código base)
-        grouped_data.append({
-            "Orden": orden,
-            "Código": family, # Usamos el código "familia"
-            "Descripción": PART_DESCRIPTIONS.get(family, "Descripción no disponible"),
-            "SH": sh,
-            "Familia": family # Columna para agrupar en el PDF
-        })
-
-        # Agrega las "variantes" si son diferentes a la familia
-        for _, row in group.iterrows():
-            if row['Código'] != family:
-                grouped_data.append({
-                    "Orden": orden, # Orden es el mismo
-                    "Código": row['Código'], # El código completo de la variante
-                    "Descripción": PART_DESCRIPTIONS.get(row['Código'], "Descripción no disponible"),
-                    "SH": sh, # SH es el mismo
-                    "Familia": family # Asigna la misma familia para agrupamiento
-                })
-                
-    return pd.DataFrame(grouped_data).sort_values(by=['Orden', 'Familia', 'Código'])
-
-
 def create_relations_table(relations):
-    """Crea una tabla PDF con códigos agrupados por familia"""
+    """Crea una tabla PDF con cada código en una línea separada."""
     if not relations:
         return None
     
-    # Agrupar por familia
-    df = group_codes_by_family(relations)
+    # Simplemente crea un DataFrame de las relaciones sin agrupar por familia
+    df = pd.DataFrame(relations)
+    
+    # Opcional: Ordena para una mejor visualización, por Orden, luego por Código
+    df = df.sort_values(by=['Orden', 'Código']).reset_index(drop=True)
     
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)
     y = 50
     
     # Título
-    title = "RELACIÓN ÓRDENES - CÓDIGOS (AGRUPADOS) - SH"
+    title = "RELACIÓN ÓRDENES - CÓDIGOS - SH" # Título ajustado
     page.insert_text((50, y), title, fontsize=16, color=(0, 0, 1), fontname="helv")
     y += 30
     
@@ -368,10 +314,10 @@ def create_relations_table(relations):
     page.insert_text((500, y), headers[3], fontsize=12, fontname="helv")
     y += 20
     
-    current_family = None
+    current_order = None # Para manejar saltos de orden
     
     for _, row in df.iterrows():
-        if y > 750:
+        if y > 750: # Si la página está llena, crea una nueva
             page = doc.new_page(width=595, height=842)
             y = 50
             # Reinsertar encabezados en nueva página
@@ -381,27 +327,23 @@ def create_relations_table(relations):
             page.insert_text((500, y), headers[3], fontsize=12, fontname="helv")
             y += 20
             
-        family = row['Familia']
-        code = row['Código']
+        order = row['Orden']
         
-        # Mostrar familia principal si cambió
-        if family != current_family:
-            page.insert_text((50, y), row['Orden'], fontsize=10)
-            # ! IMPORTANTE: Aquí se corrige la fuente a "Helvetica-Bold"
-            page.insert_text((150, y), family, fontsize=10, fontname="Helvetica-Bold")
-            page.insert_text((300, y), PART_DESCRIPTIONS.get(family, ""), fontsize=10)
-            page.insert_text((500, y), row['SH'], fontsize=10)
-            y += 15
-            current_family = family
+        # Inserta la orden si cambia o es la primera fila
+        if order != current_order:
+            if current_order is not None: # Inserta espacio extra si no es la primera orden
+                y += 10
+            page.insert_text((50, y), order, fontsize=10, fontname="helv-bold", color=(0,0,0.5)) # Orden en negrita y color diferente
+            current_order = order
+            y += 5 # Pequeño espacio después de la orden
+
+        # Inserta el código, descripción y SH en la misma línea
+        page.insert_text((150, y), row['Código'], fontsize=10) # Código
+        page.insert_text((300, y), row['Descripción'], fontsize=10) # Descripción
+        page.insert_text((500, y), row['SH'], fontsize=10) # SH
         
-        # Mostrar variante si es diferente a la familia base
-        if code != family:
-            page.insert_text((50, y), "", fontsize=10)  # Dejar orden en blanco
-            page.insert_text((150, y), "  " + code.replace(family + '-', ''), fontsize=10)
-            page.insert_text((300, y), PART_DESCRIPTIONS.get(code, ""), fontsize=10)
-            page.insert_text((500, y), row['SH'], fontsize=10)
-            y += 15
-    
+        y += 15 # Espacio para la siguiente línea
+            
     return doc
 
 # === Nueva función para crear página de SH 2 day ===
