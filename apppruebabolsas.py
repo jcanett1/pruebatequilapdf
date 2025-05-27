@@ -341,7 +341,7 @@ def create_relations_table(relations):
         # Mostrar familia principal si cambió
         if family != current_family:
             page.insert_text((50, y), row['Orden'], fontsize=10)
-            page.insert_text((150, y), family, fontsize=10, fontname="helv-b")
+            page.insert_text((150, y), family, fontsize=10, fontname="Helvetica-Bold")
             page.insert_text((300, y), PART_DESCRIPTIONS.get(family, ""), fontsize=10)
             page.insert_text((500, y), row['SH'], fontsize=10)
             y += 15
