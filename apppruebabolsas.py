@@ -444,57 +444,90 @@ def group_by_order(pages, classify_pickup=False):
 def create_part_numbers_summary(order_data):
     part_appearances = defaultdict(int)
 
+    # Acumular las apariciones de cada número de parte
     for oid, data in order_data.items():
-        part_numbers = data.get("part_numbers", {})
+        part_numbers = data.get("part_numbers", {}) # Asumiendo que esto viene de extract_part_numbers
         for part_num, count in part_numbers.items():
-            if part_num in PART_DESCRIPTIONS:
+            if part_num in PART_DESCRIPTIONS: # Solo considerar partes conocidas
                 part_appearances[part_num] += count
 
     if not part_appearances:
-        return None
+        return None # No hay nada que reportar
 
-    doc = fitz.open()
-    page = doc.new_page(width=595, height=842)
-    y = 72
+    doc = fitz.open() # Crear un nuevo documento PDF
+    page = doc.new_page(width=595, height=842) # Página A4 estándar
+    
+    y_coordinate = 72 # Posición Y inicial para escribir texto (desde arriba)
+    left_margin_code = 50
+    left_margin_desc = 150
+    left_margin_count = 450
 
+    # Escribir encabezados de la tabla
     headers = ["Código", "Descripción", "Apariciones"]
-    page.insert_text((50, y), headers[0], fontsize=12, fontname="helv", set_simple=True)
-    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv", set_simple=True)
-    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv", set_simple=True)
-    y += 25
+    page.insert_text((left_margin_code, y_coordinate), headers[0], 
+                      fontsize=12, fontname="Helvetica") # Cambiado a Helvetica, quitado set_simple
+    page.insert_text((left_margin_desc, y_coordinate), headers[1], 
+                      fontsize=12, fontname="Helvetica") # Cambiado a Helvetica, quitado set_simple
+    page.insert_text((left_margin_count, y_coordinate), headers[2], 
+                      fontsize=12, fontname="Helvetica") # Cambiado a Helvetica, quitado set_simple
+    y_coordinate += 25 # Espacio después de los encabezados
 
-    for part_num in sorted(part_appearances.keys()):
+    # Escribir los datos de cada número de parte
+    for part_num in sorted(part_appearances.keys()): # Ordenar por número de parte
         count = part_appearances[part_num]
-        if count == 0:
+        if count == 0: # Omitir si no hay apariciones (aunque defaultdict(int) no debería permitirlo aquí)
             continue
-        if y > 750:
+        
+        # Lógica para nueva página si el contenido excede el alto
+        if y_coordinate > 750: # Dejar un margen inferior
             page = doc.new_page(width=595, height=842)
-            y = 72
+            y_coordinate = 72
+            # Opcional: Re-escribir encabezados en la nueva página
+            page.insert_text((left_margin_code, y_coordinate), headers[0], 
+                              fontsize=12, fontname="Helvetica")
+            page.insert_text((left_margin_desc, y_coordinate), headers[1], 
+                              fontsize=12, fontname="Helvetica")
+            page.insert_text((left_margin_count, y_coordinate), headers[2], 
+                              fontsize=12, fontname="Helvetica")
+            y_coordinate += 25
 
-        desc = PART_DESCRIPTIONS[part_num]
-        page.insert_text((50, y), part_num, fontsize=10)
+        description = PART_DESCRIPTIONS[part_num]
+        
+        # Código de la parte (usa fuente predeterminada si no se especifica fontname)
+        page.insert_text((left_margin_code, y_coordinate), part_num, fontsize=10)
 
-        if len(desc) > 40:
-            page.insert_text((150, y), desc[:40], fontsize=9)
-            page.insert_text((150, y + 12), desc[40:], fontsize=9)
+        # Descripción (con manejo de texto largo)
+        # (usa fuente predeterminada si no se especifica fontname)
+        if len(description) > 40: # Aproximadamente 40 caracteres para el ancho de descripción
+            page.insert_text((left_margin_desc, y_coordinate), description[:40], fontsize=9)
+            page.insert_text((left_margin_desc, y_coordinate + 12), description[40:], fontsize=9)
+            line_height = 25 # Mayor altura si la descripción tiene dos líneas
         else:
-            page.insert_text((150, y), desc, fontsize=10)
+            page.insert_text((left_margin_desc, y_coordinate), description, fontsize=10)
+            line_height = 15 # Altura normal
 
-        page.insert_text((450, y), str(count), fontsize=10)
-        y += 25 if len(desc) > 40 else 15
+        # Conteo de apariciones (usa fuente predeterminada si no se especifica fontname)
+        page.insert_text((left_margin_count, y_coordinate), str(count), fontsize=10)
+        
+        y_coordinate += line_height
 
-    total = sum(part_appearances.values())
+    # Escribir el total general
+    total_appearances = sum(part_appearances.values())
+    y_coordinate += 20 # Espacio antes del total
+    
+    if y_coordinate > 780: # Revisar si el total cabe en la página actual
+        page = doc.new_page(width=595, height=842)
+        y_coordinate = 72
+
     page.insert_text(
-        (50, y + 20),
-        f"TOTAL GENERAL DE APARICIONES: {total}",
+        (left_margin_code, y_coordinate),
+        f"TOTAL GENERAL DE APARICIONES: {total_appearances}",
         fontsize=14,
-        color=(0, 0, 1),
-        fontname="helv",
-        set_simple=True
+        color=(0, 0, 1), # Color azul
+        fontname="Helvetica" # Cambiado a Helvetica, quitado set_simple
     )
 
     return doc
-
 
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, relations, two_day_sh):
     doc = fitz.open()
