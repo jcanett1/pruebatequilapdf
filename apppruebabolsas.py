@@ -333,7 +333,7 @@ def create_relations_table(relations):
         if order != current_order:
             if current_order is not None: # Inserta espacio extra si no es la primera orden
                 y += 10
-            page.insert_text((50, y), order, fontsize=10, fontname="helv-bold", color=(0,0,0.5)) # Orden en negrita y color diferente
+            page.insert_text((50, y), order, fontsize=10, fontname="helv", color=(0,0,0.5)) # Orden en negrita y color diferente
             current_order = order
             y += 5 # Pequeño espacio después de la orden
 
