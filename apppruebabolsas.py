@@ -850,6 +850,25 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
 
     return doc
 
+def extract_shipping_methods(text):
+    """
+    Extrae los métodos de envío del texto.
+    Retorna una lista con todos los métodos encontrados.
+    """
+    shipping_methods = []
+    shipping_method_regex = re.compile(r'Shipping\s*Method:\s*(.+)', re.IGNORECASE)
+    
+    for match in shipping_method_regex.finditer(text):
+        method = match.group(1).strip()
+        if method:
+            shipping_methods.append(method)
+
+    # También buscamos palabras clave como "PICKUP", "NO SHIPMENT", etc.
+    pickup_match = PICKUP_REGEX.search(text)
+    if pickup_match:
+        shipping_methods.append("PICKUP")
+
+    return shipping_methods
 # === Interfaz de Streamlit ===
 st.title("Tequila Build/Shipment PDF Processor")
 
