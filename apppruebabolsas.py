@@ -564,7 +564,7 @@ def classify_item(item_code, item_description):
     elif item_code_upper.startswith('H-') or ("HAT" in item_description_upper or "CAP" in item_description_upper):
         return "Gorras"
     # Accesorios - Si no es pelota ni gorra, y empieza con A- o HC- o G4- (guantes)
-    elif item_code_upper.startswith(('A-', 'HC-', 'G4-')):
+     elif item_code_upper.startswith(('A-', 'HC-', 'G4-')) or "GLOVE" in item_description_upper:
         return "Accesorios"
     return "Otros" # Para ítems que no encajan en ninguna categoría definida
 
