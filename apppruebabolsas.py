@@ -117,32 +117,38 @@ def parse_pdf(pdf_bytes):
     all_relations = []
     two_day_sh_list = set()
 
-    for page_num in range(len(doc)):
-        page = doc.load_page(page_num)
-        text = page.get_text("text")
-        order_id, shipment_id = extract_identifiers(text)
-        part_numbers = extract_part_numbers(text)
+    all_shipping_methods = []
 
-        if shipment_id and SHIPPING_2DAY_REGEX.search(text):
-            two_day_sh_list.add(shipment_id)
+for page_num in range(len(doc)):
+    page = doc.load_page(page_num)
+    text = page.get_text("text")
+    order_id, shipment_id = extract_identifiers(text)
+    part_numbers = extract_part_numbers(text)
+    
+    # Detectar Shipping Method
+    shipping_methods = extract_shipping_methods(text)
+    for method in shipping_methods:
+        all_shipping_methods.append({
+            "Orden": order_id,
+            "SH": shipment_id,
+            "Método de Envío": method
+        })
 
-        page_data = {
-            "number": page_num,
-            "order_id": order_id,
-            "shipment_id": shipment_id,
-            "part_numbers": part_numbers,
-            "text": text,
-            "parent": doc,  # Add the document object
-        }
-        all_pages_data.append(page_data)
+    if shipment_id and SHIPPING_2DAY_REGEX.search(text):
+        two_day_sh_list.add(shipment_id)
 
-        # Extract relations for this page
-        if order_id and shipment_id:
-            page_relations = extract_relations(text, order_id, shipment_id)
-            all_relations.extend(page_relations)
-
-    return all_pages_data, all_relations, two_day_sh_list
-
+    page_data = {
+        "number": page_num,
+        "order_id": order_id,
+        "shipment_id": shipment_id,
+        "part_numbers": part_numbers,
+        "text": text,
+        "parent": doc,
+    }
+    all_pages_data.append(page_data)
+    if order_id and shipment_id:
+        page_relations = extract_relations(text, order_id, shipment_id)
+        all_relations.extend(page_relations)
 # === Definición CORRECTA y COMPLETA de partes (diccionario) ===
 PART_DESCRIPTIONS = {
     'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
@@ -753,6 +759,44 @@ def create_gloves_table(relations):
 
     return doc
 
+def create_shipping_methods_summary(shipping_methods_data):
+    if not shipping_methods_data:
+        return None
+
+    from collections import Counter
+    method_counts = Counter()
+
+    for entry in shipping_methods_data:
+        method = entry["Método de Envío"]
+        method_counts[method] += 1
+
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    y = 72
+
+    # Título
+    page.insert_text((50, y), "RESUMEN DE MÉTODOS DE ENVÍO", fontsize=16, color=(0, 0, 1))
+    y += 30
+
+    headers = ["Método de Envío", "Cantidad"]
+    page.insert_text((50, y), headers[0], fontsize=12)
+    page.insert_text((450, y), headers[1], fontsize=12)
+    y += 20
+
+    for method, count in sorted(method_counts.items()):
+        if y > 750:
+            page = doc.new_page(width=595, height=842)
+            y = 72
+            page.insert_text((50, y), headers[0], fontsize=12)
+            page.insert_text((450, y), headers[1], fontsize=12)
+            y += 20
+
+        page.insert_text((50, y), method, fontsize=10)
+        page.insert_text((450, y), str(count), fontsize=10)
+        y += 15
+
+    return doc
+
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, all_relations, all_two_day):
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
@@ -869,6 +913,17 @@ def extract_shipping_methods(text):
         shipping_methods.append("PICKUP")
 
     return shipping_methods
+
+
+def display_shipping_methods_table(shipping_methods_data):
+    if not shipping_methods_data:
+        st.info("No se encontraron métodos de envío.")
+        return
+
+    st.subheader("Tabla Interactiva: Métodos de Envío")
+    df = pd.DataFrame(shipping_methods_data)
+    st.dataframe(df.groupby("Método de Envío").size().reset_index(name='Cantidad').sort_values(by='Cantidad', ascending=False))
+
 # === Interfaz de Streamlit ===
 st.title("Tequila Build/Shipment PDF Processor")
 
@@ -888,6 +943,7 @@ if build_file and ship_file:
     original_pages = build_pages + ship_pages
     all_relations = build_relations + ship_relations
     all_two_day = build_two_day.union(ship_two_day)
+    all_shipping_methods = build_shipping_methods + ship_shipping_methods  # Nueva línea
     all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
 
     st.subheader("Tablas Interactivas de Datos") # This is fine, it's a Streamlit command
