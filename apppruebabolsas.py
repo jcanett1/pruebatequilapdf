@@ -760,6 +760,9 @@ def create_gloves_table(relations):
     return doc
 
 def create_shipping_methods_summary(shipping_methods_data):
+    """
+    Crea una tabla PDF con un resumen de métodos de envío y sus apariciones.
+    """
     if not shipping_methods_data:
         return None
 
@@ -795,7 +798,54 @@ def create_shipping_methods_summary(shipping_methods_data):
         page.insert_text((450, y), str(count), fontsize=10)
         y += 15
 
+    total_methods = sum(method_counts.values())
+    y += 20
+    if y > 750:
+        page = doc.new_page(width=595, height=842)
+        y = 72
+    page.insert_text((50, y), f"Total de métodos de envío encontrados: {total_methods}", fontsize=12, color=(0, 0, 1))
+
     return doc
+
+
+# 6. Insertar página de SH 2 day
+two_day_page = create_2day_shipping_page(all_two_day)
+if two_day_page:
+    doc.insert_pdf(two_day_page)
+    insert_divider_page(doc, "Listado de Pelotas por Relación")
+
+
+# 7. Detectar métodos de envío desde build_pages + ship_pages
+all_shipping_methods = []
+
+for page in original_pages:
+    text = page["text"]
+    order_id = page["order_id"]
+    shipment_id = page["shipment_id"]
+
+    methods_found = extract_shipping_methods(text)
+    for method in methods_found:
+        all_shipping_methods.append({
+            "Orden": order_id,
+            "SH": shipment_id,
+            "Método de Envío": method
+        })
+
+
+# 8. Mostrar tabla interactiva de métodos de envío
+st.subheader("Tabla Interactiva: Métodos de Envío")
+if all_shipping_methods:
+    df_shipping = pd.DataFrame(all_shipping_methods)
+    st.dataframe(df_shipping.groupby("Método de Envío").size().reset_index(name='Cantidad').sort_values(by='Cantidad', ascending=False))
+else:
+    st.info("No se encontraron métodos de envío.")
+
+
+# 9. Insertar resumen de métodos de envío en PDF
+shipping_methods_summary = create_shipping_methods_summary(all_shipping_methods)
+if shipping_methods_summary:
+    doc.insert_pdf(shipping_methods_summary)
+    insert_divider_page(doc, "Resumen de Métodos de Envío")
 
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, all_relations, all_two_day):
     doc = fitz.open()
