@@ -896,12 +896,12 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
 
 def extract_shipping_methods(text):
     """
-    Extrae los métodos de envío del texto.
+    Extrae los métodos de envío del texto del PDF.
     Retorna una lista con todos los métodos encontrados.
     """
     shipping_methods = []
     shipping_method_regex = re.compile(r'Shipping\s*Method:\s*(.+)', re.IGNORECASE)
-    
+
     for match in shipping_method_regex.finditer(text):
         method = match.group(1).strip()
         if method:
@@ -911,6 +911,10 @@ def extract_shipping_methods(text):
     pickup_match = PICKUP_REGEX.search(text)
     if pickup_match:
         shipping_methods.append("PICKUP")
+
+    # Si hay órdenes sin método claro de envío, podemos marcarlas como "NO DEFINIDO"
+    if not shipping_method_regex.search(text) and not pickup_match:
+        shipping_methods.append("NO DEFINIDO")
 
     return shipping_methods
 
