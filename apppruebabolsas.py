@@ -570,7 +570,12 @@ def classify_item(item_code, item_description):
         return "Pelotas"
     elif item_code_upper.startswith('H-') or ("HAT" in item_description_upper or "CAP" in item_description_upper):
         return "Gorras"
-    elif item_code_upper.startswith(('A-', 'HC-', 'G4-')) or "GLOVE" in item_description_upper:
+
+ # Clasificar guantes específicamente
+    elif item_code_upper.startswith('G4-'):
+        return "Guantes"
+        
+   elif item_code_upper.startswith(('A-', 'HC-')):
         return "Accesorios"
     return "Otros"
 
