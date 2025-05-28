@@ -858,37 +858,31 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
         insert_divider_page(doc, "Resumen de Apariciones por Categoría") # Separador para las nuevas secciones
 
     # --- NUEVA SECCIÓN: Resumen de Apariciones por Categoría ---
-    # 2. Resumen de Apariciones: Bolsas (o 'Otros' que no son accesorios, pelotas, gorras)
-    # The 'Otros' category from classify_item will include your bags.
-    summary_bags = create_part_numbers_summary(order_meta, category_filter="Otros")
-    if summary_bags:
-        doc.insert_pdf(summary_bags)
-        # No need for a divider here if you want them to flow closely, or add if preferred.
-        # insert_divider_page(doc, "Resumen de Apariciones: Pelotas") # Optional divider
+   # 2. Resumen de Apariciones: Bolsas (Otros)
+summary_bags = create_part_numbers_summary(order_meta, category_filter="Otros")
+if summary_bags:
+    doc.insert_pdf(summary_bags)
 
-    # 3. Resumen de Apariciones: Pelotas
-    summary_balls = create_part_numbers_summary(order_meta, category_filter="Pelotas")
-    if summary_balls:
-        doc.insert_pdf(summary_balls)
-        # insert_divider_page(doc, "Resumen de Apariciones: Gorras") # Optional divider
+# 3. Resumen de Apariciones: Pelotas
+summary_balls = create_part_numbers_summary(order_meta, category_filter="Pelotas")
+if summary_balls:
+    doc.insert_pdf(summary_balls)
 
-    # 4. Resumen de Apariciones: Gorras
-    summary_hats = create_part_numbers_summary(order_meta, category_filter="Gorras")
-    if summary_hats:
-        doc.insert_pdf(summary_hats)
-        # insert_divider_page(doc, "Resumen de Apariciones: Accesorios") # Optional divider
+# 4. Resumen de Apariciones: Gorras
+summary_hats = create_part_numbers_summary(order_meta, category_filter="Gorras")
+if summary_hats:
+    doc.insert_pdf(summary_hats)
 
-   # 5. Resumen de Apariciones: Accesorios
-   summary_accessories = create_part_numbers_summary(all_relations, category_filter="Accesorios")
-   if summary_accessories:
-       doc.insert_pdf(summary_accessories)
+# 5. Resumen de Apariciones: Accesorios
+summary_accessories = create_part_numbers_summary(all_relations, category_filter="Accesorios")
+if summary_accessories:
+    doc.insert_pdf(summary_accessories)
 
-   # 5.5 Resumen de Apariciones: Guantes
-   summary_gloves = create_part_numbers_summary(all_relations, category_filter="Guantes")
-   if summary_gloves:
-        doc.insert_pdf(summary_gloves)
-         insert_divider_page(doc, "Listado de Pelotas por Relación")
-
+# 5.5 Resumen de Apariciones: Guantes
+summary_gloves = create_part_numbers_summary(all_relations, category_filter="Guantes")
+if summary_gloves:
+    doc.insert_pdf(summary_gloves)
+    insert_divider_page(doc, "Listado de Pelotas por Relación")
     # 6. Insertar página de SH 2 day
     two_day_page = create_2day_shipping_page(all_two_day)
     if two_day_page:
