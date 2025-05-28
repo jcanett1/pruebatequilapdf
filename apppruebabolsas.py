@@ -83,6 +83,18 @@ def extract_relations(text, order_id, shipment_id):
                 "Descripción": PART_DESCRIPTIONS[part_num],
                 "SH": shipment_id
             })
+
+     # Búsqueda adicional para guantes G4-6520...
+    glove_pattern = r'(G4-6520\S*)'
+    for match in re.finditer(glove_pattern, text_upper):
+        full_glove_code = match.group(1)
+        if full_glove_code in PART_DESCRIPTIONS:
+            relations.append({
+                "Orden": order_id,
+                "Código": full_glove_code,
+                "Descripción": PART_DESCRIPTIONS[full_glove_code],
+                "SH": shipment_id
+            })
     return relations
 
 
