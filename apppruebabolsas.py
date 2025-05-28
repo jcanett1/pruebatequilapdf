@@ -790,6 +790,12 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
         doc.insert_pdf(summary_accessories)
         insert_divider_page(doc, "Órdenes con Shipping Method: 2 Day") # Separador antes de lo siguiente
 
+    # 5.5 Resumen de Apariciones: Guantes
+     summary_gloves = create_part_numbers_summary(all_meta, category_filter="Guantes")
+     if summary_gloves:
+         doc.insert_pdf(summary_gloves)
+         insert_divider_page(doc, "Listado de Pelotas por Relación")
+
     # 6. Insertar página de SH 2 day
     two_day_page = create_2day_shipping_page(all_two_day)
     if two_day_page:
