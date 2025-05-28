@@ -914,15 +914,15 @@ if summary_gloves:
     # Insertar páginas de órdenes
     def insert_order_pages(order_list):
         for oid in order_list:
-            # Insertar build pages
-            for p in build_map.get(oid, {}).get("pages", []):
-                src_page = p["parent"][p["number"]]
-                doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
+        # Insertar build pages
+        for p in build_map.get(oid, {}).get("pages", []):
+            src_page = p["parent"][p["number"]]
+            doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
 
-            # Insertar ship pages
-            for p in ship_map.get(oid, {}).get("pages", []):
-                src_page = p["parent"][p["number"]]
-                doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
+        # Insertar ship pages
+        for p in ship_map.get(oid, {}).get("pages", []):
+            src_page = p["parent"][p["number"]]
+            doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
 
     # Insertar pickups primero si está habilitado
     if pickup_flag and pickups:
