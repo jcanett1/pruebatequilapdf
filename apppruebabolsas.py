@@ -2,7 +2,7 @@ import fitz # PyMuPDF
 import re
 import pandas as pd
 from collections import defaultdict
-import streamlit as st # Asegúrate de que Streamlit esté importado
+import streamlit as st
 
 # === Expresiones regulares ===
 ORDER_REGEX = re.compile(r'\b(SO-|USS|SOC|AMZ)-?(\d+)\b')
@@ -12,7 +12,6 @@ QUANTITY_REGEX = re.compile(r'(\d+)\s*(?:EA|PCS|PC|Each)', re.IGNORECASE)
 SHIPPING_2DAY_REGEX = re.compile(r'Shipping\s*Method:\s*2\s*day', re.IGNORECASE)
 
 # === Definición CORRECTA y COMPLETA de partes (diccionario) ===
-# Mantenemos esta definición aquí para asegurar que es globalmente accesible antes de las funciones.
 PART_DESCRIPTIONS = {
     'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
     'B-PG-082-WHT': '2023 PXG Lightweight Cart Bag - White/Black',
@@ -55,7 +54,7 @@ PART_DESCRIPTIONS = {
     'H-23PXG0000124-2-BG-OSFM': 'Dog Tag 6-Panel Snapback Cap - Black/Grey Logo - One Size',
     'H-23PXG0000124-2-BW-OSFM': 'Dog Tag 6-Panel Snapback Cap - Black/White Logo - One Size',
     'H-23PXG0000124-2-CG-OSFM': 'Dog Tag 6-Panel Snapback Cap - White/Grey Logo - One Size',
-    'H-23PXG0000124-2-WG-OSFM': 'Dog Tag 6-Panel Snapback Cap - White/Grey Logo - One Size', # Duplicado, mantener si es diferente
+    'H-23PXG000124-2-WG-OSFM': 'Dog Tag 6-Panel Snapback Cap - White/Grey Logo - One Size',
     'H-23PXG000078-1-S-M': 'Tour Bush Hat - White - S/M',
     'H-23PXG000094-1-OSFM-BLK': 'Faceted Front Trucker Cap - Black - One Size',
     'H-23PXG000094-1-OSFM-WHT': 'Faceted Front Trucker Cap - White - One Size',
@@ -123,7 +122,6 @@ PART_DESCRIPTIONS = {
     'A-1IBM65820PXG-DT': '2023 Darkness Dog Tag Ball Marker',
 
     # Guantes (de image_fbd6af.png, sección de abajo)
-    # Estos ahora serán categorizados como "Guantes"
     'G4-65201011HML-BLK': 'Men\'s LH Players Glove - Black ML',
     'G4-65201019HML-BLK': 'Men\'s LH Players Glove - Black M',
     'G4-65201019HMW-BLK': 'Women\'s RH Players Glove - Black M',
@@ -164,82 +162,52 @@ def extract_identifiers(text):
 def extract_part_numbers(text):
     """
     Extrae números de parte del texto.
-    Prioritiza las coincidencias más largas y asegura que un número de parte más corto
-    no se cuente si es parte de un número de parte más largo identificado
-    en la misma posición.
-    Retorna un diccionario con los números de parte encontrados como claves y valor 1.
+    Retorna un diccionario con los números de parte encontrados y su conteo.
+    Prioriza las coincidencias más largas para evitar que subcadenas se cuenten
+    como números de parte separados si son parte de uno más largo.
     """
-    part_counts = {}
+    part_counts = defaultdict(int)
     text_upper = text.upper()
 
-    all_part_keys = list(PART_DESCRIPTIONS.keys())
+    # Ordenar las claves por longitud de forma descendente para priorizar las coincidencias más largas
+    all_part_keys_sorted = sorted(PART_DESCRIPTIONS.keys(), key=len, reverse=True)
 
-    # Sort keys by length in descending order to prioritize longer matches
-    all_part_keys_sorted = sorted(all_part_keys, key=len, reverse=True)
-
-    found_indices = set() # To keep track of positions where a part number has been found
+    # Conjunto para rastrear los índices ya cubiertos por una coincidencia de un número de parte
+    covered_indices = set()
 
     for p_key in all_part_keys_sorted:
-        # Create a regex pattern to find p_key as a "whole word"
-        # (considering that '-' is not part of \w by default)
-        pattern = r'(?<!\w)' + re.escape(p_key) + r'(?!\w)'
-
+        # Usar re.finditer para encontrar todas las ocurrencias del número de parte
+        # Aseguramos que sea una "palabra completa" o delimitada por caracteres no alfanuméricos
+        pattern = r'\b' + re.escape(p_key) + r'\b' # \b es un boundary de palabra
+        
         for match in re.finditer(pattern, text_upper):
-            start_index = match.start()
-            end_index = match.end()
+            start_idx, end_idx = match.span()
 
-            # Check if this match overlaps with an already found longer match
-            # This logic needs to be careful because `re.finditer` already finds non-overlapping matches
-            # unless the pattern allows for it. The primary goal is to ensure shorter parts
-            # are not counted if a longer part that encompasses them is found.
+            # Verificar si esta coincidencia se superpone con un número de parte ya contado
+            # (especialmente útil si la lógica de \b no es lo suficientemente estricta para todos los casos)
             is_overlap = False
-            for (found_start, found_end) in found_indices:
-                if (start_index >= found_start and start_index < found_end) or \
-                   (end_index > found_start and end_index <= found_end):
+            for i in range(start_idx, end_idx):
+                if i in covered_indices:
                     is_overlap = True
                     break
             
             if not is_overlap:
-                part_counts[p_key] = part_counts.get(p_key, 0) + 1
-                # Mark all positions covered by this part number as "found"
-                for i in range(start_index, end_index):
-                    found_indices.add((i, i + 1)) # Store as (start, end) for simple overlap check
+                part_counts[p_key] += 1
+                # Marcar los índices cubiertos por esta coincidencia
+                for i in range(start_idx, end_idx):
+                    covered_indices.add(i)
+    return dict(part_counts) # Convertir a dict normal para la salida, si defaultdict no es necesario
 
-    # Re-process to ensure only valid, non-overlapping longest matches are kept.
-    # The current regex and sorted key approach handles this implicitly quite well,
-    # but a second pass can ensure no partial matches are counted if a full one exists.
-    final_part_counts = {}
-    for p_key in all_part_keys_sorted:
-        pattern = r'(?<!\w)' + re.escape(p_key) + r'(?!\w)'
-        for match in re.finditer(pattern, text_upper):
-            start_index = match.start()
-            end_index = match.end()
-            
-            is_shadowed = False
-            # Check if this match is "shadowed" by any *already confirmed* longer part
-            for confirmed_part in final_part_counts:
-                if len(confirmed_part) > len(p_key): # Only compare with longer confirmed parts
-                    # Re-find confirmed_part to get its exact match location
-                    for confirmed_match in re.finditer(r'(?<!\w)' + re.escape(confirmed_part) + r'(?!\w)', text_upper):
-                        if (start_index >= confirmed_match.start() and start_index < confirmed_match.end()) or \
-                           (end_index > confirmed_match.start() and end_index <= confirmed_match.end()):
-                            is_shadowed = True
-                            break
-                    if is_shadowed:
-                        break
-            
-            if not is_shadowed:
-                final_part_counts[p_key] = final_part_counts.get(p_key, 0) + 1
-                
-    return final_part_counts
 
 def extract_relations(text, order_id, shipment_id):
     """Extrae relaciones entre códigos, órdenes y SH"""
     relations = []
     text_upper = text.upper()
 
+    # Iterar sobre las descripciones de partes para buscar cada una
     for part_num in PART_DESCRIPTIONS:
-        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
+        # Usar un patrón de palabra completa para asegurar que solo se detecten números de parte exactos
+        pattern = r'\b' + re.escape(part_num) + r'\b'
         if re.search(pattern, text_upper) and order_id and shipment_id:
             relations.append({
                 "Orden": order_id,
@@ -266,13 +234,13 @@ def parse_pdf(pdf_bytes):
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     all_pages_data = []
     all_relations = []
-    two_day_sh_list = set()
+    two_day_sh_list = set() # This will accumulate SH IDs that have "2 day" shipping
 
     for page_num in range(len(doc)):
         page = doc.load_page(page_num)
         text = page.get_text("text")
         order_id, shipment_id = extract_identifiers(text)
-        part_numbers = extract_part_numbers(text) # Use the improved extract_part_numbers
+        part_numbers = extract_part_numbers(text)
 
         if shipment_id and SHIPPING_2DAY_REGEX.search(text):
             two_day_sh_list.add(shipment_id)
@@ -283,7 +251,7 @@ def parse_pdf(pdf_bytes):
             "shipment_id": shipment_id,
             "part_numbers": part_numbers,
             "text": text,
-            "parent": doc,  # Add the document object
+            "parent": doc,
         }
         all_pages_data.append(page_data)
 
@@ -298,7 +266,6 @@ def create_relations_table(relations):
     Crea una tabla PDF con cada código en una línea separada,
     excluyendo pelotas, gorras, guantes y otros accesorios de la lista principal.
     """
-    # Filtrar las relaciones para incluir solo los ítems clasificados como "Otros".
     filtered_relations = [
         rel for rel in relations
         if classify_item(rel["Código"], rel["Descripción"]) == "Otros"
@@ -309,7 +276,6 @@ def create_relations_table(relations):
         return None
 
     df = pd.DataFrame(filtered_relations)
-
     df = df.sort_values(by=['Orden', 'Código']).reset_index(drop=True)
 
     doc = fitz.open()
@@ -630,24 +596,37 @@ def create_category_table(relations, category_name):
 st.set_page_config(layout="wide")
 st.title("Procesador de PDFs de Órdenes")
 
-uploaded_file = st.file_uploader("Sube un PDF", type="pdf")
+st.header("Carga tus PDFs")
 
-if uploaded_file is not None:
-    pdf_bytes = uploaded_file.read()
-    all_pages_data, all_relations, two_day_sh_list = parse_pdf(pdf_bytes)
+uploaded_file_1 = st.file_uploader("Sube el PDF 1 (ej. Build Sheet)", type="pdf", key="file_uploader_1")
+uploaded_file_2 = st.file_uploader("Sube el PDF 2 (ej. Packing List)", type="pdf", key="file_uploader_2")
 
-    order_data_for_summary = group_by_order(all_pages_data, classify_pickup=True)
+if uploaded_file_1 is not None and uploaded_file_2 is not None:
+    st.success("Ambos PDFs cargados exitosamente. Procesando...")
 
-    st.success("PDF procesado exitosamente!")
+    # Procesar el primer PDF
+    all_pages_data_1, all_relations_1, two_day_sh_list_1 = parse_pdf(uploaded_file_1.read())
+
+    # Procesar el segundo PDF
+    all_pages_data_2, all_relations_2, two_day_sh_list_2 = parse_pdf(uploaded_file_2.read())
+
+    # Consolidar los datos de ambos PDFs
+    all_pages_data_combined = all_pages_data_1 + all_pages_data_2
+    all_relations_combined = all_relations_1 + all_relations_2
+    two_day_sh_list_combined = two_day_sh_list_1.union(two_day_sh_list_2) # Usar union para combinar sets
+
+    # Agrupar datos por orden para el resumen de apariciones (ahora usando los datos combinados)
+    order_data_for_summary = group_by_order(all_pages_data_combined, classify_pickup=True)
+
+    st.subheader("Resultados del Procesamiento")
 
     # --- Tablas Interactivas en Streamlit ---
     st.header("Tablas Interactivas de Relaciones por Categoría")
 
-    # Define el orden en que se mostrarán las tablas interactivas
     categories_for_display = ["Otros", "Pelotas", "Gorras", "Guantes", "Accesorios"]
 
     for category in categories_for_display:
-        display_category_table(all_relations, category)
+        display_category_table(all_relations_combined, category) # Usar relaciones combinadas
         st.markdown("---") # Separador visual entre tablas
 
     # --- Generación y Descarga de PDFs ---
@@ -655,35 +634,33 @@ if uploaded_file is not None:
     merged_pdf_doc = fitz.open()
 
     # Añadir el resumen general de relaciones (excluye las categorías específicas - solo "Otros")
-    pdf_relations = create_relations_table(all_relations)
+    pdf_relations = create_relations_table(all_relations_combined) # Usar relaciones combinadas
     if pdf_relations:
         merged_pdf_doc.insert_pdf(pdf_relations)
         insert_divider_page(merged_pdf_doc, "RELACIONES GENERALES DE PRODUCTOS (OTRAS CATEGORIAS)")
 
     # Añadir las tablas de listados por categoría al PDF (Pelotas, Gorras, Guantes, Accesorios)
-    for category in categories_for_display: # Usamos las mismas categorías para listar y resumir
-        if category != "Otros": # La categoría "Otros" ya se manejó en create_relations_table
-            pdf_category_list = create_category_table(all_relations, category)
+    for category in categories_for_display:
+        if category != "Otros":
+            pdf_category_list = create_category_table(all_relations_combined, category) # Usar relaciones combinadas
             if pdf_category_list:
                 merged_pdf_doc.insert_pdf(pdf_category_list)
                 insert_divider_page(merged_pdf_doc, f"DETALLE DE {category.upper()}")
 
     # Añadir el resumen de SH 2-day al PDF
-    pdf_2day_sh = create_2day_shipping_page(two_day_sh_list)
+    pdf_2day_sh = create_2day_shipping_page(two_day_sh_list_combined) # Usar la lista combinada de 2-day SH
     if pdf_2day_sh:
         merged_pdf_doc.insert_pdf(pdf_2day_sh)
         insert_divider_page(merged_pdf_doc, "ÓRDENES 2-DAY SHIPPING")
 
     # Añadir el resumen de apariciones por categoría al PDF
-    # Para el resumen general, category_filter debe ser None
     pdf_summary_general = create_part_numbers_summary(order_data_for_summary, category_filter=None)
     if pdf_summary_general:
         merged_pdf_doc.insert_pdf(pdf_summary_general)
         insert_divider_page(merged_pdf_doc, "RESUMEN DE APARICIONES GENERAL")
 
-    # Resúmenes específicos por categoría (Pelotas, Gorras, Guantes, Accesorios)
     for category in categories_for_display:
-        if category != "Otros": # Ya se generó un resumen general. Los "Otros" se agrupan en el general.
+        if category != "Otros":
             pdf_summary_category = create_part_numbers_summary(order_data_for_summary, category_filter=category)
             if pdf_summary_category:
                 merged_pdf_doc.insert_pdf(pdf_summary_category)
@@ -697,4 +674,6 @@ if uploaded_file is not None:
             mime="application/pdf"
         )
     else:
-        st.warning("No se generó ningún reporte PDF. Asegúrate de que el PDF contiene datos válidos.")
+        st.warning("No se generó ningún reporte PDF. Asegúrate de que los PDFs cargados contienen datos válidos.")
+else:
+    st.info("Por favor, sube ambos archivos PDF para iniciar el procesamiento.")
