@@ -65,12 +65,8 @@ def extract_part_numbers(text):
     for match in re.finditer(glove_pattern, text_upper, re.IGNORECASE):
         full_glove_code = match.group(1)
         if full_glove_code in PART_DESCRIPTIONS:
-            part_counts[full_glove_code] = 1
-        else:
-            # Opcional: muestra una alerta si el código no está en PART_DESCRIPTIONS
-            pass  # Descomenta si quieres ver qué códigos aparecen pero no están definidos
-            # st.warning(f"Código de guante encontrado pero no definido: {full_glove_code}")
-
+             part_counts[full_glove_code] = 1
+        
     return part_counts
 
 def extract_relations(text, order_id, shipment_id):
