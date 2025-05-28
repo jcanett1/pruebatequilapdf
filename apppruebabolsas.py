@@ -995,7 +995,7 @@ if build_file and ship_file:
     all_two_day = build_two_day.union(ship_two_day)
     all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
 
-    st.subheader("Tablas Interactivas de Datos") # This is fine, it's a Streamlit command
+    st.subheader("Tablas Interactivas de Datos")
 
     # Mostrar la tabla principal de Relaciones (Órdenes, Códigos, SH)
     display_interactive_table(all_relations)
@@ -1006,7 +1006,7 @@ if build_file and ship_file:
     display_category_table(all_relations, "Guantes")
     display_category_table(all_relations, "Accesorios")
 
-    st.subheader("Resumen de Órdenes y Envíos") # This is fine, it's a Streamlit command
+    st.subheader("Resumen de Órdenes y Envíos")
 
     # Mostrar SH con método 2 day
     if all_two_day:
@@ -1014,6 +1014,11 @@ if build_file and ship_file:
         st.write(", ".join(sorted(all_two_day)))
     else:
         st.warning("No se encontraron órdenes con Shipping Method: 2 day")
+
+    # ===== NUEVA SECCIÓN AÑADIDA =====
+    # Mostrar resumen de todos los métodos de envío
+    show_shipping_summary(all_meta)
+    # =================================
 
     # Botón para generar y descargar el PDF consolidado
     if st.button("Generate Merged Output"):
