@@ -555,7 +555,6 @@ def insert_divider_page(doc, label):
 # --- NUEVAS FUNCIONES PARA CLASIFICAR Y GENERAR PDFs POR CATEGORÍA ---
 
 def classify_item(item_code, item_description):
-    """Clasifica un ítem en 'Pelotas', 'Gorras', 'Accesorios'."""
     item_code_upper = item_code.upper()
     item_description_upper = item_description.upper()
 
@@ -563,10 +562,9 @@ def classify_item(item_code, item_description):
         return "Pelotas"
     elif item_code_upper.startswith('H-') or ("HAT" in item_description_upper or "CAP" in item_description_upper):
         return "Gorras"
-    # Accesorios - Si no es pelota ni gorra, y empieza con A- o HC- o G4- (guantes)
-     elif item_code_upper.startswith(('A-', 'HC-', 'G4-')) or "GLOVE" in item_description_upper:
+    elif item_code_upper.startswith(('A-', 'HC-', 'G4-')) or "GLOVE" in item_description_upper:
         return "Accesorios"
-    return "Otros" # Para ítems que no encajan en ninguna categoría definida
+    return "Otros"
 
 def create_category_table(relations, category_name):
     """
