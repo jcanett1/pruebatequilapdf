@@ -402,7 +402,19 @@ def display_interactive_table(relations):
     # Using st.dataframe for a simple interactive table
     st.dataframe(df)
 
+def filter_relations_by_category(relations, category):
+    """Filtra las relaciones por categoría."""
+    return [rel for rel in relations if classify_item(rel["Código"], rel["Descripción"]) == category]
 
+def display_category_table(relations, category):
+    """Muestra una tabla interactiva para una categoría específica."""
+    filtered_relations = filter_relations_by_category(relations, category)
+    if filtered_relations:
+        st.subheader(f"Tabla Interactiva de {category}")
+        df = pd.DataFrame(filtered_relations)
+        st.dataframe(df)
+    else:
+        st.info(f"No se encontraron relaciones de {category} para mostrar.")
 
 def create_summary_page(order_data, build_keys, shipment_keys, pickup_flag):
     all_orders = set(build_keys) | set(shipment_keys)
@@ -764,8 +776,23 @@ if build_file and ship_file:
     all_two_day = build_two_day.union(ship_two_day)
     all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
 
-    # Mostrar tabla interactiva
+    ---
+
+    ## Tablas Interactivas de Datos
+    ---
+
+    # Mostrar la tabla principal de Relaciones (Órdenes, Códigos, SH)
     display_interactive_table(all_relations)
+
+    # Mostrar tablas interactivas por categoría
+    display_category_table(all_relations, "Pelotas")
+    display_category_table(all_relations, "Gorras")
+    display_category_table(all_relations, "Accesorios")
+
+    ---
+
+    ## Resumen de Órdenes y Envíos
+    ---
 
     # Mostrar SH con método 2 day
     if all_two_day:
@@ -774,7 +801,10 @@ if build_file and ship_file:
     else:
         st.warning("No se encontraron órdenes con Shipping Method: 2 day")
 
+    # Botón para generar y descargar el PDF consolidado
     if st.button("Generate Merged Output"):
+        # Asegúrate de que estas variables se calculen correctamente
+        # antes de pasarlas a merge_documents
         build_map = group_by_order(build_pages)
         ship_map = group_by_order(ship_pages)
         build_order = get_build_order_list(build_pages)
@@ -793,3 +823,7 @@ if build_file and ship_file:
             data=merged.tobytes(),
             file_name="Tequila_Merged_Output.pdf"
         )
+elif build_file or ship_file:
+    st.info("Por favor, sube AMBOS PDFs (Build Sheets y Shipment Pick Lists) para procesar.")
+else:
+    st.info("Sube tus archivos PDF para comenzar el procesamiento y ver las tablas.")
