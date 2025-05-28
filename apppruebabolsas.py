@@ -1,8 +1,8 @@
-import streamlit as st
-import fitz  # PyMuPDF
+import fitz # PyMuPDF
 import re
 import pandas as pd
 from collections import defaultdict
+import streamlit as st # Asegúrate de que Streamlit esté importado
 
 # === Expresiones regulares ===
 ORDER_REGEX = re.compile(r'\b(SO-|USS|SOC|AMZ)-?(\d+)\b')
@@ -256,6 +256,7 @@ PART_DESCRIPTIONS = {
     'A-1IBM65820PXG-DT': '2023 Darkness Dog Tag Ball Marker',
 
     # Guantes (de image_fbd6af.png, sección de abajo)
+    # Estos ahora serán categorizados como "Guantes"
     'G4-65201011HML-BLK': 'Men\'s LH Players Glove - Black ML',
     'G4-65201019HML-BLK': 'Men\'s LH Players Glove - Black M', # Asumo que era M y no ML como el anterior con mismo código base
     'G4-65201019HMW-BLK': 'Women\'s RH Players Glove - Black M', # Asumo que este es RH (Right Hand) basado en el patrón
@@ -285,32 +286,27 @@ PART_DESCRIPTIONS = {
     'G4-652021019MLC-WHT': 'Men\'s RH Players Glove - Cadet White M', # RH Cadet M (Posiblemente duplicado/conflicto con G4-65201019RMLC-WHT)
 
     # === INICIO DE NUEVOS GUANTES SOLICITADOS ===
-    # POR FAVOR, AGREGA AQUÍ LOS NUEVOS CÓDIGOS Y DESCRIPCIONES DE GUANTES QUE NECESITAS.
-    # Asegúrate de que los códigos sean únicos y no existan ya en la lista.
-    # Ejemplo:
-    # 'G4-NEWGLOVE-BLK-M': 'Nuevo Guante Ejemplo Negro Talla M (LH)',
-    # 'G4-NEWGLOVE-WHT-L': 'Otro Guante Ejemplo Blanco Talla L (RH)',
+    # Ya están arriba los G4-
     # === FIN DE NUEVOS GUANTES SOLICITADOS ===
 }
 
 def create_relations_table(relations):
     """
     Crea una tabla PDF con cada código en una línea separada,
-    excluyendo pelotas, gorras y accesorios de la lista principal.
+    excluyendo pelotas, gorras, guantes y otros accesorios de la lista principal.
     """
     if not relations:
         return None
     
     # Filtrar las relaciones para incluir solo los ítems clasificados como "Otros".
-    # Esto elimina pelotas, gorras y accesorios de esta tabla.
+    # Esto elimina pelotas, gorras, guantes y accesorios de esta tabla.
     filtered_relations = [
         rel for rel in relations
         if classify_item(rel["Código"], rel["Descripción"]) == "Otros"
     ]
 
     if not filtered_relations:
-        #st.info("No se encontraron relaciones de 'Otros' productos para mostrar en la tabla principal.")
-        print("Información: No se encontraron relaciones de 'Otros' productos para mostrar en la tabla principal.") # Para no depender de st aquí
+        print("Información: No se encontraron relaciones de 'Otros' productos para mostrar en la tabla principal.")
         return None
         
     df = pd.DataFrame(filtered_relations)
@@ -323,7 +319,7 @@ def create_relations_table(relations):
     y = 50
     
     # Título para la tabla, indicando la exclusión.
-    title = "RELACIÓN ÓRDENES - CÓDIGOS - SH (Excluyendo Pelotas, Gorras y Accesorios)"
+    title = "RELACIÓN ÓRDENES - CÓDIGOS - SH (Excluyendo Pelotas, Gorras, Guantes y Accesorios)"
     page.insert_text((50, y), title, fontsize=16, color=(0, 0, 1), fontname="helv")
     y += 30
     
@@ -387,7 +383,7 @@ def create_2day_shipping_page(two_day_sh_list):
     
     # Título
     page.insert_text((72, y), "ÓRDENES CON SHIPPING METHOD: 2 DAY",
-                      fontsize=16, color=(0, 0, 1), fontname="helv")
+                     fontsize=16, color=(0, 0, 1), fontname="helv")
     y += 30
     
     # Lista de SH
@@ -399,7 +395,7 @@ def create_2day_shipping_page(two_day_sh_list):
         y += 20
     
     page.insert_text((72, y + 20), f"Total de órdenes 2 day: {len(two_day_sh_list)}",
-                      fontsize=14, color=(0, 0, 1))
+                     fontsize=14, color=(0, 0, 1))
     
     return doc
 
@@ -604,24 +600,20 @@ def insert_divider_page(doc, label):
     """Crea una página divisoria con texto de etiqueta"""
     page = doc.new_page(width=595, height=842) # Especificar tamaño
     text = f"=== {label.upper()} ==="
-    # Calcular dimensiones del texto para centrarlo (opcional)
-    # tw = fitz.get_text_length(text, fontname="helv", fontsize=18)
-    # page_width = page.rect.width
-    # x_coord = (page_width - tw) / 2
-    # y_coord = page.rect.height / 2
-    # page.insert_text((x_coord, y_coord), text, ...)
     page.insert_text(
         point=(72, page.rect.height / 2), # Centrado verticalmente, margen izquierdo
         text=text,
         fontsize=18,
-        fontname="helv", # Asegurar que "helv" es un nombre válido o usar "Helvetica"
+        fontname="helv",
         color=(0, 0, 0)
     )
 
 # --- NUEVAS FUNCIONES PARA CLASIFICAR Y GENERAR PDFs POR CATEGORÍA ---
 
 def classify_item(item_code, item_description):
-    """Clasifica un ítem en 'Pelotas', 'Gorras', 'Accesorios', 'Otros'."""
+    """
+    Clasifica un ítem en 'Pelotas', 'Gorras', 'Guantes', 'Accesorios', 'Otros'.
+    """
     item_code_upper = item_code.upper()
     item_description_upper = item_description.upper()
 
@@ -629,10 +621,12 @@ def classify_item(item_code, item_description):
         return "Pelotas"
     elif item_code_upper.startswith('H-') or ("HAT" in item_description_upper or "CAP" in item_description_upper):
         return "Gorras"
-    # Accesorios - Si no es pelota ni gorra, y empieza con A- o HC- o G4- (guantes)
-    elif item_code_upper.startswith(('A-', 'HC-', 'G4-')): # Guantes G4- se clasifican como Accesorios
+    elif item_code_upper.startswith('G4-'): # Nueva categoría para GUANTES
+        return "Guantes"
+    elif item_code_upper.startswith(('A-', 'HC-')): # Otros accesorios (excluyendo guantes)
         return "Accesorios"
     return "Otros" # Para ítems que no encajan en ninguna categoría definida (ej. Bolsas)
+
 
 def create_category_table(relations, category_name):
     """
@@ -642,75 +636,71 @@ def create_category_table(relations, category_name):
 
     for rel in relations:
         if classify_item(rel["Código"], rel["Descripción"]) == category_name:
-            # Guardar cada relación que coincida con la categoría
             category_items_with_sh.append({
-                "Orden": rel["Orden"], # Podríamos necesitar la orden para desambiguar SH si un código aparece en múltiples órdenes
+                "Orden": rel["Orden"],
                 "Código": rel["Código"],
                 "Descripción": rel["Descripción"],
                 "SH": rel["SH"]
             })
-    
+
     if not category_items_with_sh:
+        print(f"Información: No se encontraron relaciones de '{category_name}' para mostrar en la tabla PDF.")
         return None
 
-    # Para el listado de ítems únicos por categoría, podemos agrupar después
-    # O si solo queremos una lista única de códigos y su primera descripción/SH:
-    unique_items_display = {}
-    for item in category_items_with_sh:
-        if item["Código"] not in unique_items_display:
-            unique_items_display[item["Código"]] = {
-                "Descripción": item["Descripción"],
-                "SH": item["SH"] # Tomamos el SH de la primera vez que aparece este código
-            }
-    
-    category_data_for_pdf = [{ "Código": code, **details} for code, details in unique_items_display.items()]
-
-
-    if not category_data_for_pdf: # Doble chequeo, aunque el anterior debería cubrirlo
-        return None
+    df_category = pd.DataFrame(category_items_with_sh)
+    df_category = df_category.sort_values(by=['Orden', 'Código']).reset_index(drop=True)
 
     doc = fitz.open()
-    page = doc.new_page(width=595, height=842)
-    y = 50
+    page = doc.new_page(width=595, height=842) # A4 size
 
-    page.insert_text((50, y), f"LISTADO DE {category_name.upper()}",
-                      fontsize=16, color=(0, 0, 1), fontname="helv")
+    y = 50
+    # Título de la tabla de categoría
+    title = f"RELACIÓN ÓRDENES - CÓDIGOS - SH ({category_name.upper()})"
+    page.insert_text((50, y), title, fontsize=16, color=(0, 0, 1), fontname="helv")
     y += 30
 
-    headers = ["Código", "Descripción", "SH Asociado"]
+    # Encabezados de la tabla
+    headers = ["Orden", "Código", "Descripción", "SH"]
     page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
-    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv") # Ajustado
-    page.insert_text((450, y), headers[2], fontsize=12, fontname="helv") # Ajustado
+    page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
+    page.insert_text((300, y), headers[2], fontsize=12, fontname="helv")
+    page.insert_text((500, y), headers[3], fontsize=12, fontname="helv")
     y += 20
 
-    df_category = pd.DataFrame(category_data_for_pdf).sort_values(by=["Código"])
+    current_order = None
 
     for _, row in df_category.iterrows():
-        if y > 750:
+        if y > 750: # Si la página está llena, crea una nueva página
             page = doc.new_page(width=595, height=842)
             y = 50
             page.insert_text((50, y), headers[0], fontsize=12, fontname="helv")
             page.insert_text((150, y), headers[1], fontsize=12, fontname="helv")
-            page.insert_text((450, y), headers[2], fontsize=12, fontname="helv")
+            page.insert_text((300, y), headers[2], fontsize=12, fontname="helv")
+            page.insert_text((500, y), headers[3], fontsize=12, fontname="helv")
             y += 20
 
-        page.insert_text((50, y), row["Código"], fontsize=10)
-        
-        desc = row["Descripción"]
-        max_desc_len_pdf_cat = 45 # Límite para descripción en esta tabla
-        y_offset_for_next_line = 0
-        if len(desc) > max_desc_len_pdf_cat:
-            parts = [desc[i:i+max_desc_len_pdf_cat] for i in range(0, len(desc), max_desc_len_pdf_cat)]
-            for i, part_desc in enumerate(parts):
-                 page.insert_text((150, y + i * 12), part_desc, fontsize=9)
-            y_offset_for_next_line = (len(parts)-1) * 12
+        order = row['Orden']
+
+        if order != current_order:
+            if current_order is not None:
+                y += 10 # Espacio extra entre órdenes
+            page.insert_text((50, y), order, fontsize=10, fontname="helv", color=(0,0,0.5))
+            current_order = order
+            y += 5
+
+        page.insert_text((150, y), row['Código'], fontsize=10)
+
+        description = row['Descripción']
+        max_desc_len_pdf = 30
+        if len(description) > max_desc_len_pdf:
+            page.insert_text((300, y), description[:max_desc_len_pdf] + "...", fontsize=9)
         else:
-            page.insert_text((150, y), desc, fontsize=10)
+            page.insert_text((300, y), description, fontsize=10)
 
-        page.insert_text((450, y), row["SH"], fontsize=10)
-        y += 15 + y_offset_for_next_line
+        page.insert_text((500, y), row['SH'], fontsize=10)
+        y += 15 # Espacio para la siguiente línea
+
     return doc
-
 
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, all_relations, all_two_day_sh): # Renombrado all_two_day
     doc = fitz.open()
@@ -764,125 +754,116 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
 
 # === Interfaz de Usuario Streamlit ===
 st.set_page_config(layout="wide")
-st.title("Analizador de PDF de Órdenes de Golf")
+st.title("Procesador de PDFs de Órdenes")
 
-uploaded_file = st.file_uploader("Cargar archivo(s) PDF", type="pdf", accept_multiple_files=True)
+uploaded_file = st.file_uploader("Sube un PDF", type="pdf")
 
-if uploaded_file:
-    # Inicializar listas y sets para acumular datos de todos los archivos
-    master_all_pages_data = []
-    master_all_relations = []
-    master_two_day_sh_list = set()
-    master_order_meta = defaultdict(lambda: {"pages": [], "pickup": False, "part_numbers": defaultdict(int)})
+if uploaded_file is not None:
+    pdf_bytes = uploaded_file.read()
+    all_pages_data, all_relations, two_day_sh_list = parse_pdf(pdf_bytes)
 
-    for single_file in uploaded_file:
-        st.info(f"Procesando archivo: {single_file.name}...")
-        pdf_bytes = single_file.getvalue()
-        
-        # Parse individual PDF
-        all_pages_data, all_relations, two_day_sh_list = parse_pdf(pdf_bytes)
-        
-        # Aggregate data
-        master_all_pages_data.extend(all_pages_data)
-        master_all_relations.extend(all_relations)
-        master_two_day_sh_list.update(two_day_sh_list)
+    # Agrupar datos por orden para el resumen de apariciones
+    order_data_for_summary = group_by_order(all_pages_data, classify_pickup=True)
 
-    # Group orders from all files after all are parsed
-    # Esto es crucial: group_by_order debe operar sobre el conjunto completo de datos de página
-    # para que los conteos de partes por orden sean correctos a través de múltiples archivos
-    # si una orden se extiende entre archivos (aunque es poco común para este caso de uso).
-    # Más bien, aquí order_meta debería ser una agregación de order_metas individuales si
-    # cada PDF es independiente.
-    # Para simplificar, vamos a asumir que cada PDF es un conjunto de órdenes y recalculamos order_meta globalmente.
-    # O mejor, procesamos order_meta por archivo y luego lo fusionamos.
-    
-    # Para el cálculo de apariciones globales, necesitamos `order_meta` de todos los archivos.
-    # Re-procesar `group_by_order` en `master_all_pages_data` para obtener un `master_order_meta` global.
-    if master_all_pages_data:
-         current_order_meta = group_by_order(master_all_pages_data, classify_pickup=True) # classify_pickup según necesidad
+    st.success("PDF procesado exitosamente!")
 
-    st.success(f"Procesamiento de {len(uploaded_file)} archivo(s) completado.")
+    # --- Tablas Interactivas en Streamlit ---
+    st.header("Tablas Interactivas")
 
-    # --- Calcular apariciones globales de partes ---
-    global_part_appearances = defaultdict(int)
-    if master_all_pages_data: # Solo si hay datos
-        # Usar current_order_meta que se calculó a partir de master_all_pages_data
-        for _order_id, data in current_order_meta.items():
-            for part_code, count_in_order in data.get("part_numbers", {}).items():
-                if part_code in PART_DESCRIPTIONS:
-                    global_part_appearances[part_code] += count_in_order
-    
+    # Tabla para "Otros" (Bolsas, etc.) - lo que no es Pelotas, Gorras, Guantes, Accesorios
+    display_category_table(all_relations, "Otros")
     st.markdown("---")
-    # --- Mostrar la tabla interactiva mejorada ---
-    if master_all_relations:
-        display_interactive_table(master_all_relations, global_part_appearances)
+
+    # Tabla para Pelotas
+    display_category_table(all_relations, "Pelotas")
+    st.markdown("---")
+
+    # Tabla para Gorras
+    display_category_table(all_relations, "Gorras")
+    st.markdown("---")
+
+    # ¡NUEVA! Tabla para Guantes
+    display_category_table(all_relations, "Guantes")
+    st.markdown("---")
+
+    # Tabla para Accesorios (sin Guantes ahora)
+    display_category_table(all_relations, "Accesorios")
+    st.markdown("---")
+
+    # Puedes seguir mostrando la tabla interactiva general si la necesitas
+    # all_part_appearances = defaultdict(int)
+    # for oid, data in order_data_for_summary.items():
+    #     for part_num, count_in_order in data.get("part_numbers", {}).items():
+    #         all_part_appearances[part_num] += count_in_order
+    # display_interactive_table(all_relations, all_part_appearances)
+
+
+    # --- Generación y Descarga de PDFs ---
+    st.header("Generación de Reportes PDF")
+    merged_pdf_doc = fitz.open()
+
+    # Añadir el resumen general de relaciones (excluye las categorías específicas)
+    pdf_relations = create_relations_table(all_relations)
+    if pdf_relations:
+        merged_pdf_doc.insert_pdf(pdf_relations)
+        insert_divider_page(merged_pdf_doc, "Resumen General de Productos") # Divisor
+
+    # Añadir la tabla de Pelotas al PDF
+    pdf_pelotas = create_category_table(all_relations, "Pelotas")
+    if pdf_pelotas:
+        merged_pdf_doc.insert_pdf(pdf_pelotas)
+        insert_divider_page(merged_pdf_doc, "Detalle de Pelotas") # Divisor
+
+    # Añadir la tabla de Gorras al PDF
+    pdf_gorras = create_category_table(all_relations, "Gorras")
+    if pdf_gorras:
+        merged_pdf_doc.insert_pdf(pdf_gorras)
+        insert_divider_page(merged_pdf_doc, "Detalle de Gorras") # Divisor
+
+    # ¡NUEVA! Añadir la tabla de Guantes al PDF
+    pdf_guantes = create_category_table(all_relations, "Guantes")
+    if pdf_guantes:
+        merged_pdf_doc.insert_pdf(pdf_guantes)
+        insert_divider_page(merged_pdf_doc, "Detalle de Guantes") # Divisor
+
+    # Añadir la tabla de Accesorios (sin Guantes) al PDF
+    pdf_accesorios = create_category_table(all_relations, "Accesorios")
+    if pdf_accesorios:
+        merged_pdf_doc.insert_pdf(pdf_accesorios)
+        insert_divider_page(merged_pdf_doc, "Detalle de Accesorios") # Divisor
+
+    # Añadir el resumen de SH 2-day al PDF
+    pdf_2day_sh = create_2day_shipping_page(two_day_sh_list)
+    if pdf_2day_sh:
+        merged_pdf_doc.insert_pdf(pdf_2day_sh)
+        insert_divider_page(merged_pdf_doc, "Órdenes 2-Day Shipping") # Divisor
+
+    # Añadir el resumen de apariciones por categoría al PDF
+    # Primero, para la categoría general
+    pdf_summary_general = create_part_numbers_summary(order_data_for_summary)
+    if pdf_summary_general:
+        merged_pdf_doc.insert_pdf(pdf_summary_general)
+        insert_divider_page(merged_pdf_doc, "Resumen de Apariciones General") # Divisor
+
+    # Resumen de apariciones para Guantes
+    pdf_summary_guantes = create_part_numbers_summary(order_data_for_summary, category_filter="Guantes")
+    if pdf_summary_guantes:
+        merged_pdf_doc.insert_pdf(pdf_summary_guantes)
+        insert_divider_page(merged_pdf_doc, "Resumen de Apariciones Guantes") # Divisor
+
+    # Resumen de apariciones para Accesorios
+    pdf_summary_accesorios = create_part_numbers_summary(order_data_for_summary, category_filter="Accesorios")
+    if pdf_summary_accesorios:
+        merged_pdf_doc.insert_pdf(pdf_summary_accesorios)
+        insert_divider_page(merged_pdf_doc, "Resumen de Apariciones Accesorios") # Divisor
+
+
+    if merged_pdf_doc.page_count > 0:
+        st.download_button(
+            label="Descargar Reporte PDF Completo",
+            data=merged_pdf_doc.tobytes(),
+            file_name="reporte_completo_ordenes.pdf",
+            mime="application/pdf"
+        )
     else:
-        st.info("No se encontraron relaciones en los PDFs cargados.")
-
-    # --- Mostrar otras tablas de categorías (opcional) ---
-    # st.markdown("---")
-    # categories_to_display = ["Pelotas", "Gorras", "Accesorios", "Otros"]
-    # for category in categories_to_display:
-    #     display_category_table(master_all_relations, category) # Usa master_all_relations
-
-    # --- Generación de Reporte PDF Consolidado ---
-    st.markdown("---")
-    st.subheader("Generar Reporte PDF Consolidado")
-
-    if st.button("Generar PDF"):
-        if not master_all_pages_data:
-            st.warning("No hay datos procesados para generar el PDF. Carga archivos primero.")
-        else:
-            st.info("Generando PDF consolidado...")
-            # Para merge_documents, necesitaríamos `build_order`, `build_map`, `ship_map`.
-            # Estos no se construyen en este flujo simplificado de Streamlit.
-            # Por ahora, generaremos un PDF con las tablas y resúmenes disponibles.
-            
-            consolidated_doc = fitz.open()
-
-            # 1. Tabla de Relaciones ('Otros')
-            relations_pdf = create_relations_table(master_all_relations)
-            if relations_pdf:
-                consolidated_doc.insert_pdf(relations_pdf)
-
-            divider_label_summary = "Resúmenes de Apariciones por Categoría"
-            if consolidated_doc.page_count > 0 : insert_divider_page(consolidated_doc, divider_label_summary)
-
-
-            # 2. Resúmenes de Apariciones por Categoría
-            categories_for_pdf = ["Otros", "Pelotas", "Gorras", "Accesorios"]
-            for category in categories_for_pdf:
-                summary_cat_pdf = create_part_numbers_summary(current_order_meta, category_filter=category) # Usa current_order_meta
-                if summary_cat_pdf:
-                    consolidated_doc.insert_pdf(summary_cat_pdf)
-            
-            divider_label_listing = "Listados de Items por Categoría"
-            if consolidated_doc.page_count > 0 : insert_divider_page(consolidated_doc, divider_label_listing)
-
-            # 3. Listados de Items por Categoría
-            for category in categories_for_pdf:
-                category_list_pdf = create_category_table(master_all_relations, category)
-                if category_list_pdf:
-                    consolidated_doc.insert_pdf(category_list_pdf)
-
-            # 4. Página de Envíos "2 day"
-            if master_two_day_sh_list:
-                two_day_pdf = create_2day_shipping_page(master_two_day_sh_list)
-                if two_day_pdf:
-                    divider_label_shipping = "Envíos Urgentes (2 Días)"
-                    if consolidated_doc.page_count > 0 : insert_divider_page(consolidated_doc, divider_label_shipping)
-                    consolidated_doc.insert_pdf(two_day_pdf)
-
-            if consolidated_doc.page_count > 0:
-                final_pdf_bytes = consolidated_doc.tobytes()
-                st.download_button(
-                    label="Descargar PDF Consolidado",
-                    data=final_pdf_bytes,
-                    file_name="reporte_consolidado_golf.pdf",
-                    mime="application/pdf"
-                )
-                st.success("PDF consolidado generado y listo para descargar.")
-            else:
-                st.warning("No se generó contenido para el PDF consolidado.")
-else:
-    st.info("Por favor, carga uno o más archivos PDF para comenzar el análisis.")
+        st.warning("No se generó ningún reporte PDF. Asegúrate de que el PDF contiene datos válidos.")
