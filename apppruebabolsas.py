@@ -878,16 +878,15 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
         doc.insert_pdf(summary_hats)
         # insert_divider_page(doc, "Resumen de Apariciones: Accesorios") # Optional divider
 
-    # 5. Resumen de Apariciones: Accesorios (incluye guantes y headcovers si tu classify_item los pone ahí)
-    summary_accessories = create_part_numbers_summary(order_meta, category_filter="Accesorios")
-    if summary_accessories:
-        doc.insert_pdf(summary_accessories)
-        insert_divider_page(doc, "Órdenes con Shipping Method: 2 Day") # Separador antes de lo siguiente
+   # 5. Resumen de Apariciones: Accesorios
+   summary_accessories = create_part_numbers_summary(all_relations, category_filter="Accesorios")
+   if summary_accessories:
+       doc.insert_pdf(summary_accessories)
 
-    # 5.5 Resumen de Apariciones: Guantes
-     summary_gloves = create_part_numbers_summary(all_relations, category_filter="Guantes")
-     if summary_gloves:
-         doc.insert_pdf(summary_gloves)
+   # 5.5 Resumen de Apariciones: Guantes
+   summary_gloves = create_part_numbers_summary(all_relations, category_filter="Guantes")
+   if summary_gloves:
+        doc.insert_pdf(summary_gloves)
          insert_divider_page(doc, "Listado de Pelotas por Relación")
 
     # 6. Insertar página de SH 2 day
