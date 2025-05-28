@@ -776,10 +776,7 @@ if build_file and ship_file:
     all_two_day = build_two_day.union(ship_two_day)
     all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
 
-    ---
-
-    ## Tablas Interactivas de Datos
-    ---
+    st.subheader("Tablas Interactivas de Datos") # This is fine, it's a Streamlit command
 
     # Mostrar la tabla principal de Relaciones (Órdenes, Códigos, SH)
     display_interactive_table(all_relations)
@@ -789,10 +786,7 @@ if build_file and ship_file:
     display_category_table(all_relations, "Gorras")
     display_category_table(all_relations, "Accesorios")
 
-    ---
-
-    ## Resumen de Órdenes y Envíos
-    ---
+    st.subheader("Resumen de Órdenes y Envíos") # This is fine, it's a Streamlit command
 
     # Mostrar SH con método 2 day
     if all_two_day:
