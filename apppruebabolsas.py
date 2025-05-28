@@ -753,6 +753,72 @@ def create_gloves_table(relations):
 
     return doc
 
+def create_shipping_methods_summary(order_meta):
+    """Crea un resumen de los métodos de envío y su frecuencia"""
+    doc = fitz.open()
+    
+    # Contar frecuencia de métodos de envío
+    shipping_counts = {
+        "GU 9 PICKUP PO BOX": 0,
+        "AK 9 NO SHIPMENT GENERAL DELIVERY": 0,
+        "PR 0 HAND DELIVER": 0,
+        "RIO BAYAMON": 0,
+        "HI 9": 0,
+        "OVERNIGHT": 0,
+        "CANADA": 0,
+        "2 DAY": 0
+    }
+    
+    for oid, meta in order_meta.items():
+        shipping_method = meta.get("shipping_method", "").upper()
+        
+        if "GU 9" in shipping_method and "PO BOX" in shipping_method:
+            shipping_counts["GU 9 PICKUP PO BOX"] += 1
+        elif "AK 9" in shipping_method and "GENERAL DELIVERY" in shipping_method:
+            shipping_counts["AK 9 NO SHIPMENT GENERAL DELIVERY"] += 1
+        elif "PR 0" in shipping_method and "HAND DELIVER" in shipping_method:
+            shipping_counts["PR 0 HAND DELIVER"] += 1
+        elif "RIO BAYAMON" in shipping_method:
+            shipping_counts["RIO BAYAMON"] += 1
+        elif "HI 9" in shipping_method:
+            shipping_counts["HI 9"] += 1
+        elif "OVERNIGHT" in shipping_method:
+            shipping_counts["OVERNIGHT"] += 1
+        elif "CANADA" in shipping_method:
+            shipping_counts["CANADA"] += 1
+        elif "2 DAY" in shipping_method:
+            shipping_counts["2 DAY"] += 1
+    
+    # Crear tabla con los resultados
+    table_data = [["Método de Envío", "Cantidad"]]
+    for method, count in shipping_counts.items():
+        if count > 0:  # Solo mostrar métodos que aparecen al menos una vez
+            table_data.append([method, str(count)])
+    
+    if len(table_data) > 1:  # Si hay datos para mostrar
+        page = doc.new_page()
+        # Configurar título
+        title = "Resumen de Métodos de Envío"
+        title_rect = fitz.Rect(50, 50, 550, 100)
+        page.insert_textbox(title_rect, title, 
+                          fontsize=16, 
+                          align=fitz.TEXT_ALIGN_CENTER,
+                          fontname="helv")
+        
+        # Configurar tabla
+        tab_rect = fitz.Rect(50, 100, 550, 700)
+        table = page.new_table()
+        table.set_data(table_data)
+        table.update_cells()
+        table.update(tab_rect)
+        
+    return doc
+
+
+
+
+
+
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, all_relations, all_two_day):
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
@@ -801,6 +867,13 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
     if two_day_page:
         doc.insert_pdf(two_day_page)
         insert_divider_page(doc, "Listado de Pelotas por Relación") # Separador
+
+
+    # NUEVA SECCIÓN: Resumen de métodos de envío
+    shipping_summary = create_shipping_methods_summary(order_meta)
+    if shipping_summary:
+        doc.insert_pdf(shipping_summary)
+        insert_divider_page(doc, "Órdenes con Shipping Method: 2 Day")
 
     # 7. Insertar página de Pelotas (listado de relaciones, no de apariciones)
     pelotas_doc = create_category_table(all_relations, "Pelotas")
