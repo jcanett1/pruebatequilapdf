@@ -777,6 +777,7 @@ if build_file and ship_file:
     # Mostrar tablas interactivas por categoría
     display_category_table(all_relations, "Pelotas")
     display_category_table(all_relations, "Gorras")
+    display_category_table(all_relations, "Guantes")
     display_category_table(all_relations, "Accesorios")
 
     st.subheader("Resumen de Órdenes y Envíos") # This is fine, it's a Streamlit command
