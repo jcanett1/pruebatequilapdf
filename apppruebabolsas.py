@@ -791,7 +791,7 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
         insert_divider_page(doc, "Órdenes con Shipping Method: 2 Day") # Separador antes de lo siguiente
 
     # 5.5 Resumen de Apariciones: Guantes
-     summary_gloves = create_part_numbers_summary(all_meta, category_filter="Guantes")
+     summary_gloves = create_part_numbers_summary(all_relations, category_filter="Guantes")
      if summary_gloves:
          doc.insert_pdf(summary_gloves)
          insert_divider_page(doc, "Listado de Pelotas por Relación")
