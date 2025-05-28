@@ -855,74 +855,77 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
     relations_table = create_relations_table(all_relations)
     if relations_table:
         doc.insert_pdf(relations_table)
-        insert_divider_page(doc, "Resumen de Apariciones por Categoría") # Separador para las nuevas secciones
+        insert_divider_page(doc, "Resumen de Apariciones por Categoría")  # Separador para las nuevas secciones
 
     # --- NUEVA SECCIÓN: Resumen de Apariciones por Categoría ---
-   # 2. Resumen de Apariciones: Bolsas (Otros)
-summary_bags = create_part_numbers_summary(order_meta, category_filter="Otros")
-if summary_bags:
-    doc.insert_pdf(summary_bags)
+    # 2. Resumen de Apariciones: Bolsas (Otros)
+    summary_bags = create_part_numbers_summary(order_meta, category_filter="Otros")
+    if summary_bags:
+        doc.insert_pdf(summary_bags)
 
-# 3. Resumen de Apariciones: Pelotas
-summary_balls = create_part_numbers_summary(order_meta, category_filter="Pelotas")
-if summary_balls:
-    doc.insert_pdf(summary_balls)
+    # 3. Resumen de Apariciones: Pelotas
+    summary_balls = create_part_numbers_summary(order_meta, category_filter="Pelotas")
+    if summary_balls:
+        doc.insert_pdf(summary_balls)
 
-# 4. Resumen de Apariciones: Gorras
-summary_hats = create_part_numbers_summary(order_meta, category_filter="Gorras")
-if summary_hats:
-    doc.insert_pdf(summary_hats)
+    # 4. Resumen de Apariciones: Gorras
+    summary_hats = create_part_numbers_summary(order_meta, category_filter="Gorras")
+    if summary_hats:
+        doc.insert_pdf(summary_hats)
 
-# 5. Resumen de Apariciones: Accesorios
-summary_accessories = create_part_numbers_summary(all_relations, category_filter="Accesorios")
-if summary_accessories:
-    doc.insert_pdf(summary_accessories)
+    # 5. Resumen de Apariciones: Accesorios
+    summary_accessories = create_part_numbers_summary(all_relations, category_filter="Accesorios")
+    if summary_accessories:
+        doc.insert_pdf(summary_accessories)
 
-# 5.5 Resumen de Apariciones: Guantes
-summary_gloves = create_part_numbers_summary(all_relations, category_filter="Guantes")
-if summary_gloves:
-    doc.insert_pdf(summary_gloves)
-    insert_divider_page(doc, "Listado de Pelotas por Relación")
+    # 5.5 Resumen de Apariciones: Guantes
+    summary_gloves = create_part_numbers_summary(all_relations, category_filter="Guantes")
+    if summary_gloves:
+        doc.insert_pdf(summary_gloves)
+        insert_divider_page(doc, "Listado de Pelotas por Relación")
+
     # 6. Insertar página de SH 2 day
     two_day_page = create_2day_shipping_page(all_two_day)
     if two_day_page:
         doc.insert_pdf(two_day_page)
-        insert_divider_page(doc, "Listado de Pelotas por Relación") # Separador
+        insert_divider_page(doc, "Listado de Pelotas por Relación")  # Separador
 
     # 7. Insertar página de Pelotas (listado de relaciones, no de apariciones)
     pelotas_doc = create_category_table(all_relations, "Pelotas")
     if pelotas_doc:
         doc.insert_pdf(pelotas_doc)
-        insert_divider_page(doc, "Listado de Gorras por Relación") # Separador para la siguiente categoría
+        insert_divider_page(doc, "Listado de Gorras por Relación")  # Separador para la siguiente categoría
 
     # 8. Insertar página de Gorras (listado de relaciones)
     gorras_doc = create_category_table(all_relations, "Gorras")
     if gorras_doc:
         doc.insert_pdf(gorras_doc)
-        insert_divider_page(doc, "Listado de Accesorios por Relación") # Separador para la siguiente categoría
-   # 8.5 Insertar página de Guantes (listado de relaciones)
+        insert_divider_page(doc, "Listado de Accesorios por Relación")  # Separador para la siguiente categoría
+
+    # 8.5 Insertar página de Guantes (listado de relaciones)
     gloves_doc = create_gloves_table(all_relations)
     if gloves_doc:
         doc.insert_pdf(gloves_doc)
         insert_divider_page(doc, "Listado de Accesorios por Relación")
+
     # 9. Insertar página de Accesorios (listado de relaciones)
     accesorios_doc = create_category_table(all_relations, "Accesorios")
     if accesorios_doc:
         doc.insert_pdf(accesorios_doc)
-        insert_divider_page(doc, "Documentos Principales") # Separador antes de los docs originales
+        insert_divider_page(doc, "Documentos Principales")  # Separador antes de los docs originales
 
-    # Insertar páginas de órdenes
+    # === FUNCIÓN INTERNA: Insertar páginas de órdenes ===
     def insert_order_pages(order_list):
         for oid in order_list:
-        # Insertar build pages
-        for p in build_map.get(oid, {}).get("pages", []):
-            src_page = p["parent"][p["number"]]
-            doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
+            # Insertar build pages
+            for p in build_map.get(oid, {}).get("pages", []):
+                src_page = p["parent"][p["number"]]
+                doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
 
-        # Insertar ship pages
-        for p in ship_map.get(oid, {}).get("pages", []):
-            src_page = p["parent"][p["number"]]
-            doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
+            # Insertar ship pages
+            for p in ship_map.get(oid, {}).get("pages", []):
+                src_page = p["parent"][p["number"]]
+                doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
 
     # Insertar pickups primero si está habilitado
     if pickup_flag and pickups:
