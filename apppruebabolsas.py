@@ -754,54 +754,41 @@ def create_gloves_table(relations):
     return doc
 
 def create_shipping_methods_summary(order_meta):
-    """Crea un resumen de los métodos de envío y su frecuencia"""
+    """Crea un resumen completo de los métodos de envío y su frecuencia"""
     doc = fitz.open()
     
-    # Inicializar contadores con todos los métodos posibles
-    shipping_counts = {
-        "GU 9 PICKUP PO BOX": 0,
-        "AK 9 NO SHIPMENT GENERAL DELIVERY": 0,
-        "PR 0 HAND DELIVER": 0,
-        "RIO BAYAMON": 0,
-        "HI 9": 0,
-        "OVERNIGHT": 0,
-        "CANADA": 0,
-        "2 DAY": 0
-    }
+    # Métodos de envío a incluir (según lo que mencionaste)
+    shipping_methods = [
+        "GU 9", "PICKUP", "PO BOX",
+        "AK 9", "NO SHIPMENT", "GENERAL DELIVERY",
+        "PR 0", "HAND DELIVER",
+        "RIO BAYAMON",
+        "HI 9",
+        "OVERNIGHT",
+    ]
     
-    # Verificar si order_meta es válido
+    # Inicializar contadores
+    shipping_counts = {method: 0 for method in shipping_methods}
+    
     if not isinstance(order_meta, dict):
         return doc
     
-    # Contar frecuencias de métodos de envío
+    # Contar frecuencias
     for oid, meta in order_meta.items():
         if not isinstance(meta, dict):
             continue
             
         shipping_method = str(meta.get("shipping_method", "")).upper().strip()
         
-        # Determinar el tipo de método de envío
         if not shipping_method:
             continue
             
-        if "GU 9" in shipping_method and "PO BOX" in shipping_method:
-            shipping_counts["GU 9 PICKUP PO BOX"] += 1
-        elif "AK 9" in shipping_method and "GENERAL DELIVERY" in shipping_method:
-            shipping_counts["AK 9 NO SHIPMENT GENERAL DELIVERY"] += 1
-        elif "PR 0" in shipping_method and "HAND DELIVER" in shipping_method:
-            shipping_counts["PR 0 HAND DELIVER"] += 1
-        elif "RIO BAYAMON" in shipping_method:
-            shipping_counts["RIO BAYAMON"] += 1
-        elif "HI 9" in shipping_method:
-            shipping_counts["HI 9"] += 1
-        elif "OVERNIGHT" in shipping_method:
-            shipping_counts["OVERNIGHT"] += 1
-        elif "CANADA" in shipping_method:
-            shipping_counts["CANADA"] += 1
-        elif "2 DAY" in shipping_method:
-            shipping_counts["2 DAY"] += 1
+        # Verificar cada método
+        for method in shipping_methods:
+            if method in shipping_method:
+                shipping_counts[method] += 1
     
-    # Filtrar métodos que no aparecieron
+    # Filtrar métodos con al menos una ocurrencia
     shipping_counts = {k: v for k, v in shipping_counts.items() if v > 0}
     
     if not shipping_counts:
@@ -810,25 +797,63 @@ def create_shipping_methods_summary(order_meta):
     # Crear página con la tabla
     page = doc.new_page()
     
-    # Añadir título
-    title = "Resumen de Métodos de Envío"
-    title_rect = fitz.Rect(50, 50, 550, 100)
+    # Título principal
+    title = "Resumen de Órdenes y Envíos"
+    title_rect = fitz.Rect(50, 30, 550, 80)
     page.insert_textbox(title_rect, title, 
-                      fontsize=16, 
+                      fontsize=18, 
                       align=fitz.TEXT_ALIGN_CENTER,
-                      fontname="helv")
+                      fontname="helv",
+                      fontfile=None,
+                      color=(0, 0, 0))
+    
+    # Subtítulo
+    subtitle = "Métodos de Envío Utilizados"
+    subtitle_rect = fitz.Rect(50, 80, 550, 110)
+    page.insert_textbox(subtitle_rect, subtitle, 
+                       fontsize=14, 
+                       align=fitz.TEXT_ALIGN_CENTER,
+                       fontname="helv",
+                       color=(0.2, 0.2, 0.2))
     
     # Crear tabla de datos
     table_data = [["Método de Envío", "Cantidad"]]
-    for method, count in shipping_counts.items():
-        table_data.append([method, str(count)])
+    
+    # Agrupar métodos relacionados
+    grouped_methods = [
+        ("GU 9 / PICKUP / PO BOX", ["GU 9", "PICKUP", "PO BOX"]),
+        ("AK 9 / NO SHIPMENT / GENERAL DELIVERY", ["AK 9", "NO SHIPMENT", "GENERAL DELIVERY"]),
+        ("PR 0 / HAND DELIVER", ["PR 0", "HAND DELIVER"]),
+        ("RIO BAYAMON", ["RIO BAYAMON"]),
+        ("HI 9", ["HI 9"]),
+        ("OVERNIGHT", ["OVERNIGHT"]),
+    ]
+    
+    for group_name, methods in grouped_methods:
+        total = sum(shipping_counts.get(method, 0) for method in methods)
+        if total > 0:
+            table_data.append([group_name, str(total)])
     
     # Añadir tabla al PDF
-    tab_rect = fitz.Rect(50, 100, 550, 700)
-    table = page.new_table()
-    table.set_data(table_data)
-    table.update_cells()
-    table.update(tab_rect)
+    if len(table_data) > 1:  # Si hay datos para mostrar
+        tab_rect = fitz.Rect(50, 120, 550, 700)
+        table = page.new_table()
+        table.set_data(table_data)
+        
+        # Estilo de la tabla
+        table.set_style(fitz.TableStyle(
+            fontsize=11,
+            align=fitz.TEXT_ALIGN_LEFT,
+            header_fontsize=12,
+            header_align=fitz.TEXT_ALIGN_CENTER,
+            header_fill=(0.8, 0.8, 0.8),
+            even_fill=(0.95, 0.95, 0.95),
+            odd_fill=(1, 1, 1),
+            grid_color=(0.7, 0.7, 0.7)
+        ))
+        
+        table.update_cells()
+        table.update(tab_rect)
     
     return doc
 
