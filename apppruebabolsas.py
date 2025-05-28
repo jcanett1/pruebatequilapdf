@@ -117,38 +117,32 @@ def parse_pdf(pdf_bytes):
     all_relations = []
     two_day_sh_list = set()
 
-    all_shipping_methods = []
+    for page_num in range(len(doc)):
+        page = doc.load_page(page_num)
+        text = page.get_text("text")
+        order_id, shipment_id = extract_identifiers(text)
+        part_numbers = extract_part_numbers(text)
 
-for page_num in range(len(doc)):
-    page = doc.load_page(page_num)
-    text = page.get_text("text")
-    order_id, shipment_id = extract_identifiers(text)
-    part_numbers = extract_part_numbers(text)
-    
-    # Detectar Shipping Method
-    shipping_methods = extract_shipping_methods(text)
-    for method in shipping_methods:
-        all_shipping_methods.append({
-            "Orden": order_id,
-            "SH": shipment_id,
-            "Método de Envío": method
-        })
+        if shipment_id and SHIPPING_2DAY_REGEX.search(text):
+            two_day_sh_list.add(shipment_id)
 
-    if shipment_id and SHIPPING_2DAY_REGEX.search(text):
-        two_day_sh_list.add(shipment_id)
+        page_data = {
+            "number": page_num,
+            "order_id": order_id,
+            "shipment_id": shipment_id,
+            "part_numbers": part_numbers,
+            "text": text,
+            "parent": doc,  # Add the document object
+        }
+        all_pages_data.append(page_data)
 
-    page_data = {
-        "number": page_num,
-        "order_id": order_id,
-        "shipment_id": shipment_id,
-        "part_numbers": part_numbers,
-        "text": text,
-        "parent": doc,
-    }
-    all_pages_data.append(page_data)
-    if order_id and shipment_id:
-        page_relations = extract_relations(text, order_id, shipment_id)
-        all_relations.extend(page_relations)
+        # Extract relations for this page
+        if order_id and shipment_id:
+            page_relations = extract_relations(text, order_id, shipment_id)
+            all_relations.extend(page_relations)
+
+    return all_pages_data, all_relations, two_day_sh_list
+
 # === Definición CORRECTA y COMPLETA de partes (diccionario) ===
 PART_DESCRIPTIONS = {
     'B-PG-081-BLK': '2023 PXG Deluxe Cart Bag - Black',
@@ -759,94 +753,6 @@ def create_gloves_table(relations):
 
     return doc
 
-def create_shipping_methods_summary(shipping_methods_data):
-    """
-    Crea una tabla PDF con un resumen de métodos de envío y sus apariciones.
-    """
-    if not shipping_methods_data:
-        return None
-
-    from collections import Counter
-    method_counts = Counter()
-
-    for entry in shipping_methods_data:
-        method = entry["Método de Envío"]
-        method_counts[method] += 1
-
-    doc = fitz.open()
-    page = doc.new_page(width=595, height=842)
-    y = 72
-
-    # Título
-    page.insert_text((50, y), "RESUMEN DE MÉTODOS DE ENVÍO", fontsize=16, color=(0, 0, 1))
-    y += 30
-
-    headers = ["Método de Envío", "Cantidad"]
-    page.insert_text((50, y), headers[0], fontsize=12)
-    page.insert_text((450, y), headers[1], fontsize=12)
-    y += 20
-
-    for method, count in sorted(method_counts.items()):
-        if y > 750:
-            page = doc.new_page(width=595, height=842)
-            y = 72
-            page.insert_text((50, y), headers[0], fontsize=12)
-            page.insert_text((450, y), headers[1], fontsize=12)
-            y += 20
-
-        page.insert_text((50, y), method, fontsize=10)
-        page.insert_text((450, y), str(count), fontsize=10)
-        y += 15
-
-    total_methods = sum(method_counts.values())
-    y += 20
-    if y > 750:
-        page = doc.new_page(width=595, height=842)
-        y = 72
-    page.insert_text((50, y), f"Total de métodos de envío encontrados: {total_methods}", fontsize=12, color=(0, 0, 1))
-
-    return doc
-
-
-# 6. Insertar página de SH 2 day
-two_day_page = create_2day_shipping_page(all_two_day)
-if two_day_page:
-    doc.insert_pdf(two_day_page)
-    insert_divider_page(doc, "Listado de Pelotas por Relación")
-
-
-# 7. Detectar métodos de envío desde build_pages + ship_pages
-all_shipping_methods = []
-
-for page in original_pages:
-    text = page["text"]
-    order_id = page["order_id"]
-    shipment_id = page["shipment_id"]
-
-    methods_found = extract_shipping_methods(text)
-    for method in methods_found:
-        all_shipping_methods.append({
-            "Orden": order_id,
-            "SH": shipment_id,
-            "Método de Envío": method
-        })
-
-
-# 8. Mostrar tabla interactiva de métodos de envío
-st.subheader("Tabla Interactiva: Métodos de Envío")
-if all_shipping_methods:
-    df_shipping = pd.DataFrame(all_shipping_methods)
-    st.dataframe(df_shipping.groupby("Método de Envío").size().reset_index(name='Cantidad').sort_values(by='Cantidad', ascending=False))
-else:
-    st.info("No se encontraron métodos de envío.")
-
-
-# 9. Insertar resumen de métodos de envío en PDF
-shipping_methods_summary = create_shipping_methods_summary(all_shipping_methods)
-if shipping_methods_summary:
-    doc.insert_pdf(shipping_methods_summary)
-    insert_divider_page(doc, "Resumen de Métodos de Envío")
-
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, all_relations, all_two_day):
     doc = fitz.open()
     pickups = [oid for oid in build_order if order_meta[oid]["pickup"]] if pickup_flag else []
@@ -855,66 +761,70 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
     relations_table = create_relations_table(all_relations)
     if relations_table:
         doc.insert_pdf(relations_table)
-        insert_divider_page(doc, "Resumen de Apariciones por Categoría")  # Separador para las nuevas secciones
+        insert_divider_page(doc, "Resumen de Apariciones por Categoría") # Separador para las nuevas secciones
 
     # --- NUEVA SECCIÓN: Resumen de Apariciones por Categoría ---
-    # 2. Resumen de Apariciones: Bolsas (Otros)
+    # 2. Resumen de Apariciones: Bolsas (o 'Otros' que no son accesorios, pelotas, gorras)
+    # The 'Otros' category from classify_item will include your bags.
     summary_bags = create_part_numbers_summary(order_meta, category_filter="Otros")
     if summary_bags:
         doc.insert_pdf(summary_bags)
+        # No need for a divider here if you want them to flow closely, or add if preferred.
+        # insert_divider_page(doc, "Resumen de Apariciones: Pelotas") # Optional divider
 
     # 3. Resumen de Apariciones: Pelotas
     summary_balls = create_part_numbers_summary(order_meta, category_filter="Pelotas")
     if summary_balls:
         doc.insert_pdf(summary_balls)
+        # insert_divider_page(doc, "Resumen de Apariciones: Gorras") # Optional divider
 
     # 4. Resumen de Apariciones: Gorras
     summary_hats = create_part_numbers_summary(order_meta, category_filter="Gorras")
     if summary_hats:
         doc.insert_pdf(summary_hats)
+        # insert_divider_page(doc, "Resumen de Apariciones: Accesorios") # Optional divider
 
-    # 5. Resumen de Apariciones: Accesorios
-    summary_accessories = create_part_numbers_summary(all_relations, category_filter="Accesorios")
+    # 5. Resumen de Apariciones: Accesorios (incluye guantes y headcovers si tu classify_item los pone ahí)
+    summary_accessories = create_part_numbers_summary(order_meta, category_filter="Accesorios")
     if summary_accessories:
         doc.insert_pdf(summary_accessories)
+        insert_divider_page(doc, "Órdenes con Shipping Method: 2 Day") # Separador antes de lo siguiente
 
     # 5.5 Resumen de Apariciones: Guantes
-    summary_gloves = create_part_numbers_summary(all_relations, category_filter="Guantes")
-    if summary_gloves:
-        doc.insert_pdf(summary_gloves)
-        insert_divider_page(doc, "Listado de Pelotas por Relación")
+     summary_gloves = create_part_numbers_summary(all_relations, category_filter="Guantes")
+     if summary_gloves:
+         doc.insert_pdf(summary_gloves)
+         insert_divider_page(doc, "Listado de Pelotas por Relación")
 
     # 6. Insertar página de SH 2 day
     two_day_page = create_2day_shipping_page(all_two_day)
     if two_day_page:
         doc.insert_pdf(two_day_page)
-        insert_divider_page(doc, "Listado de Pelotas por Relación")  # Separador
+        insert_divider_page(doc, "Listado de Pelotas por Relación") # Separador
 
     # 7. Insertar página de Pelotas (listado de relaciones, no de apariciones)
     pelotas_doc = create_category_table(all_relations, "Pelotas")
     if pelotas_doc:
         doc.insert_pdf(pelotas_doc)
-        insert_divider_page(doc, "Listado de Gorras por Relación")  # Separador para la siguiente categoría
+        insert_divider_page(doc, "Listado de Gorras por Relación") # Separador para la siguiente categoría
 
     # 8. Insertar página de Gorras (listado de relaciones)
     gorras_doc = create_category_table(all_relations, "Gorras")
     if gorras_doc:
         doc.insert_pdf(gorras_doc)
-        insert_divider_page(doc, "Listado de Accesorios por Relación")  # Separador para la siguiente categoría
-
-    # 8.5 Insertar página de Guantes (listado de relaciones)
+        insert_divider_page(doc, "Listado de Accesorios por Relación") # Separador para la siguiente categoría
+   # 8.5 Insertar página de Guantes (listado de relaciones)
     gloves_doc = create_gloves_table(all_relations)
     if gloves_doc:
         doc.insert_pdf(gloves_doc)
         insert_divider_page(doc, "Listado de Accesorios por Relación")
-
     # 9. Insertar página de Accesorios (listado de relaciones)
     accesorios_doc = create_category_table(all_relations, "Accesorios")
     if accesorios_doc:
         doc.insert_pdf(accesorios_doc)
-        insert_divider_page(doc, "Documentos Principales")  # Separador antes de los docs originales
+        insert_divider_page(doc, "Documentos Principales") # Separador antes de los docs originales
 
-    # === FUNCIÓN INTERNA: Insertar páginas de órdenes ===
+    # Insertar páginas de órdenes
     def insert_order_pages(order_list):
         for oid in order_list:
             # Insertar build pages
@@ -940,40 +850,6 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
 
     return doc
 
-def extract_shipping_methods(text):
-    """
-    Extrae los métodos de envío del texto del PDF.
-    Retorna una lista con todos los métodos encontrados.
-    """
-    shipping_methods = []
-    shipping_method_regex = re.compile(r'Shipping\s*Method:\s*(.+)', re.IGNORECASE)
-
-    for match in shipping_method_regex.finditer(text):
-        method = match.group(1).strip()
-        if method:
-            shipping_methods.append(method)
-
-    # También buscamos palabras clave como "PICKUP", "NO SHIPMENT", etc.
-    pickup_match = PICKUP_REGEX.search(text)
-    if pickup_match:
-        shipping_methods.append("PICKUP")
-
-    # Si hay órdenes sin método claro de envío, podemos marcarlas como "NO DEFINIDO"
-    if not shipping_method_regex.search(text) and not pickup_match:
-        shipping_methods.append("NO DEFINIDO")
-
-    return shipping_methods
-
-
-def display_shipping_methods_table(shipping_methods_data):
-    if not shipping_methods_data:
-        st.info("No se encontraron métodos de envío.")
-        return
-
-    st.subheader("Tabla Interactiva: Métodos de Envío")
-    df = pd.DataFrame(shipping_methods_data)
-    st.dataframe(df.groupby("Método de Envío").size().reset_index(name='Cantidad').sort_values(by='Cantidad', ascending=False))
-
 # === Interfaz de Streamlit ===
 st.title("Tequila Build/Shipment PDF Processor")
 
@@ -993,7 +869,6 @@ if build_file and ship_file:
     original_pages = build_pages + ship_pages
     all_relations = build_relations + ship_relations
     all_two_day = build_two_day.union(ship_two_day)
-    all_shipping_methods = build_shipping_methods + ship_shipping_methods  # Nueva línea
     all_meta = group_by_order(original_pages, classify_pickup=pickup_flag)
 
     st.subheader("Tablas Interactivas de Datos") # This is fine, it's a Streamlit command
