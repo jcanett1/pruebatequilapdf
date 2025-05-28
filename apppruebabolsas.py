@@ -832,8 +832,6 @@ def create_shipping_methods_summary(order_meta):
     
     return doc
 
-
-
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, all_relations, all_two_day):
     doc = fitz.open()
     
@@ -849,89 +847,93 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
         relations_table = create_relations_table(all_relations)
         if relations_table:
             doc.insert_pdf(relations_table)
-            insert_divider_page(doc, "Resumen de Apariciones por Categoría") # Separador para las nuevas secciones
+            insert_divider_page(doc, "Resumen de Apariciones por Categoría")
 
-    # --- NUEVA SECCIÓN: Resumen de Apariciones por Categoría ---
-    # 2. Resumen de Apariciones: Bolsas (o 'Otros' que no son accesorios, pelotas, gorras)
-    # The 'Otros' category from classify_item will include your bags.
+    # 2. Resumen de Apariciones: Bolsas
     summary_bags = create_part_numbers_summary(order_meta, category_filter="Otros")
     if summary_bags:
         doc.insert_pdf(summary_bags)
-        # No need for a divider here if you want them to flow closely, or add if preferred.
-        # insert_divider_page(doc, "Resumen de Apariciones: Pelotas") # Optional divider
 
     # 3. Resumen de Apariciones: Pelotas
     summary_balls = create_part_numbers_summary(order_meta, category_filter="Pelotas")
     if summary_balls:
         doc.insert_pdf(summary_balls)
-        # insert_divider_page(doc, "Resumen de Apariciones: Gorras") # Optional divider
 
     # 4. Resumen de Apariciones: Gorras
     summary_hats = create_part_numbers_summary(order_meta, category_filter="Gorras")
     if summary_hats:
         doc.insert_pdf(summary_hats)
-        # insert_divider_page(doc, "Resumen de Apariciones: Accesorios") # Optional divider
 
-    # 5. Resumen de Apariciones: Accesorios (incluye guantes y headcovers si tu classify_item los pone ahí)
-    summary_accessories = create_part_numbers_summary(all_relations, category_filter="Accesorios")
+    # 5. Resumen de Apariciones: Accesorios
+    # CORRECCIÓN: Usar order_meta en lugar de all_relations
+    summary_accessories = create_part_numbers_summary(order_meta, category_filter="Accesorios")
     if summary_accessories:
         doc.insert_pdf(summary_accessories)
-        insert_divider_page(doc, "Órdenes con Shipping Method: 2 Day") # Separador antes de lo siguiente
-
+    
     # 5.5 Resumen de Apariciones: Guantes
-    summary_gloves = create_part_numbers_summary(all_relations, category_filter="Guantes")
+    # CORRECCIÓN: Usar order_meta en lugar de all_relations
+    summary_gloves = create_part_numbers_summary(order_meta, category_filter="Guantes")
     if summary_gloves:
         doc.insert_pdf(summary_gloves)
         insert_divider_page(doc, "Listado de Pelotas por Relación")
 
-    # 6. Insertar página de SH 2 day
-    two_day_page = create_2day_shipping_page(all_two_day)
-    if two_day_page:
-        doc.insert_pdf(two_day_page)
-        insert_divider_page(doc, "Listado de Pelotas por Relación") # Separador
-
-
-     # NUEVA SECCIÓN: Resumen de métodos de envío
+    # NUEVA SECCIÓN: Resumen de métodos de envío
     if isinstance(order_meta, dict):
         shipping_summary = create_shipping_methods_summary(order_meta)
         if shipping_summary:
             doc.insert_pdf(shipping_summary)
             insert_divider_page(doc, "Órdenes con Shipping Method: 2 Day")
 
-    # 7. Insertar página de Pelotas (listado de relaciones, no de apariciones)
+    # 6. Insertar página de SH 2 day
+    two_day_page = create_2day_shipping_page(all_two_day)
+    if two_day_page:
+        doc.insert_pdf(two_day_page)
+        insert_divider_page(doc, "Listado de Pelotas por Relación")
+
+    # 7. Insertar página de Pelotas (listado de relaciones)
     pelotas_doc = create_category_table(all_relations, "Pelotas")
     if pelotas_doc:
         doc.insert_pdf(pelotas_doc)
-        insert_divider_page(doc, "Listado de Gorras por Relación") # Separador para la siguiente categoría
+        insert_divider_page(doc, "Listado de Gorras por Relación")
 
     # 8. Insertar página de Gorras (listado de relaciones)
     gorras_doc = create_category_table(all_relations, "Gorras")
     if gorras_doc:
         doc.insert_pdf(gorras_doc)
-        insert_divider_page(doc, "Listado de Accesorios por Relación") # Separador para la siguiente categoría
-   # 8.5 Insertar página de Guantes (listado de relaciones)
+        insert_divider_page(doc, "Listado de Accesorios por Relación")
+
+    # 8.5 Insertar página de Guantes (listado de relaciones)
     gloves_doc = create_gloves_table(all_relations)
     if gloves_doc:
         doc.insert_pdf(gloves_doc)
         insert_divider_page(doc, "Listado de Accesorios por Relación")
+
     # 9. Insertar página de Accesorios (listado de relaciones)
     accesorios_doc = create_category_table(all_relations, "Accesorios")
     if accesorios_doc:
         doc.insert_pdf(accesorios_doc)
-        insert_divider_page(doc, "Documentos Principales") # Separador antes de los docs originales
+        insert_divider_page(doc, "Documentos Principales")
 
     # Insertar páginas de órdenes
     def insert_order_pages(order_list):
         for oid in order_list:
-            # Insertar build pages
-            for p in build_map.get(oid, {}).get("pages", []):
-                src_page = p["parent"][p["number"]]
-                doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
+            # Insertar build pages con manejo seguro
+            build_pages = build_map.get(oid, {}).get("pages", [])
+            for p in build_pages:
+                if isinstance(p, dict) and "parent" in p and "number" in p:
+                    try:
+                        doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
+                    except Exception as e:
+                        print(f"Error insertando build page para orden {oid}: {str(e)}")
 
-            # Insertar ship pages
-            for p in ship_map.get(oid, {}).get("pages", []):
-                src_page = p["parent"][p["number"]]
-                doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
+            # Insertar ship pages con manejo seguro
+            ship_pages = ship_map.get(oid, {}).get("pages", [])
+            for p in ship_pages:
+                if isinstance(p, dict) and "parent" in p and "number" in p:
+                    try:
+                        doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
+                    except Exception as e:
+                        print(f"Error insertando ship page para orden {oid}: {str(e)}")
 
     # Insertar pickups primero si está habilitado
     if pickup_flag and pickups:
@@ -945,6 +947,7 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
         insert_order_pages(others)
 
     return doc
+
 
 # === Interfaz de Streamlit ===
 st.title("Tequila Build/Shipment PDF Processor")
