@@ -690,6 +690,68 @@ def create_category_table(relations, category_name):
 
     return doc
 
+def create_gloves_table(relations):
+    """
+    Crea una tabla PDF solo para guantes (códigos que empiezan con G4-).
+    """
+    gloves_data = [
+        rel for rel in relations
+        if rel["Código"].startswith("G4-")
+    ]
+
+    if not gloves_data:
+        return None
+
+    # Usamos un diccionario para evitar duplicados
+    unique_gloves = {}
+    for rel in gloves_data:
+        code = rel["Código"]
+        if code not in unique_gloves:
+            unique_gloves[code] = {
+                "Código": code,
+                "Descripción": rel["Descripción"],
+                "SH": rel["SH"]
+            }
+
+    doc = fitz.open()
+    page = doc.new_page(width=595, height=842)
+    y = 50
+
+    # Título
+    page.insert_text((50, y), "LISTADO DE GUANTES", fontsize=16, color=(0, 0, 1))
+    y += 30
+
+    headers = ["Código", "Descripción", "SH"]
+    page.insert_text((50, y), headers[0], fontsize=12)
+    page.insert_text((200, y), headers[1], fontsize=12)
+    page.insert_text((450, y), headers[2], fontsize=12)
+    y += 20
+
+    df = pd.DataFrame(unique_gloves.values()).sort_values(by="Código")
+
+    for _, row in df.iterrows():
+        if y > 750:
+            page = doc.new_page(width=595, height=842)
+            y = 50
+            # Reinsertar encabezados
+            page.insert_text((50, y), headers[0], fontsize=12)
+            page.insert_text((200, y), headers[1], fontsize=12)
+            page.insert_text((450, y), headers[2], fontsize=12)
+            y += 20
+
+        page.insert_text((50, y), row["Código"], fontsize=10)
+        desc = row["Descripción"]
+        if len(desc) > 50:
+            page.insert_text((200, y), desc[:50], fontsize=9)
+            page.insert_text((200, y + 12), desc[50:], fontsize=9)
+            y += 12
+        else:
+            page.insert_text((200, y), desc, fontsize=10)
+
+        page.insert_text((450, y), row["SH"], fontsize=10)
+        y += 15
+
+    return doc
 
 def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, all_relations, all_two_day):
     doc = fitz.open()
@@ -745,7 +807,11 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
     if gorras_doc:
         doc.insert_pdf(gorras_doc)
         insert_divider_page(doc, "Listado de Accesorios por Relación") # Separador para la siguiente categoría
-
+   # 8.5 Insertar página de Guantes (listado de relaciones)
+    gloves_doc = create_gloves_table(all_relations)
+    if gloves_doc:
+        doc.insert_pdf(gloves_doc)
+        insert_divider_page(doc, "Listado de Accesorios por Relación")
     # 9. Insertar página de Accesorios (listado de relaciones)
     accesorios_doc = create_category_table(all_relations, "Accesorios")
     if accesorios_doc:
