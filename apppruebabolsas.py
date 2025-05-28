@@ -31,8 +31,9 @@ def extract_part_numbers(text):
     part_counts = {}
     text_upper = text.upper()
     all_part_keys = list(PART_DESCRIPTIONS.keys())
+    
+    # Buscar coincidencias exactas definidas en PART_DESCRIPTIONS
     for p_short in all_part_keys:
-        # Patrón para encontrar p_short como una "palabra completa"
         pattern_short = r'(?<!\w)' + re.escape(p_short) + r'(?!\w)'
         found_standalone_match_for_p_short = False
         for match_short in re.finditer(pattern_short, text_upper):
@@ -54,15 +55,22 @@ def extract_part_numbers(text):
                         is_this_match_shadowed_by_a_longer_one = True
                         break
             if not is_this_match_shadowed_by_a_longer_one:
-                # Verificar si hay variaciones comunes después del código base
-                match_end_index = match_short.end()
-                suffix_pattern = r'(?:-(?:OS|FM|S|M|L|XL|ML|RL|SC|WHT|BLK|RXL|HL))?'
-                combined_pattern = re.compile(re.escape(p_short) + suffix_pattern, re.IGNORECASE)
-                if combined_pattern.search(text_upper, match_short.start()):
-                    found_standalone_match_for_p_short = True
-                    break
+                found_standalone_match_for_p_short = True
+                break
         if found_standalone_match_for_p_short:
             part_counts[p_short] = 1
+
+    # === BÚSQUEDA ADICIONAL PARA GUANTES QUE COMIENZAN CON G4-6520 ===
+    glove_pattern = r'(G4-6520[^\s\-]*)'
+    for match in re.finditer(glove_pattern, text_upper, re.IGNORECASE):
+        full_glove_code = match.group(1)
+        if full_glove_code in PART_DESCRIPTIONS:
+            part_counts[full_glove_code] = 1
+        else:
+            # Opcional: muestra una alerta si el código no está en PART_DESCRIPTIONS
+            pass  # Descomenta si quieres ver qué códigos aparecen pero no están definidos
+            # st.warning(f"Código de guante encontrado pero no definido: {full_glove_code}")
+
     return part_counts
 
 def extract_relations(text, order_id, shipment_id):
