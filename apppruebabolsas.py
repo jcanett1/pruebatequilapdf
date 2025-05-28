@@ -174,7 +174,7 @@ PART_DESCRIPTIONS = {
     'B-UGB8-EP': '2020 Carry Stand Bag - Black',
 
     # --- CÓDIGOS DE LAS IMÁGENES ---
-   # image_fbd711.png (Golf Balls)
+    # image_fbd711.png (Golf Balls)
     'GB-DOZ-XTREME': 'Xtreme Golf Ball - Dozen',
     'GB-DOZ-XTTR-WHT': 'Xtreme Tour Golf Ball - White - Dozen',
     'GB-DOZ-XTTR-YEL': 'Xtreme Tour Golf Ball - Yellow - Dozen',
@@ -687,61 +687,27 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
         doc.insert_pdf(summary_hats)
         # insert_divider_page(doc, "Resumen de Apariciones: Accesorios") # Optional divider
 
-    # 5. Resumen de Apariciones: Accesorios (incluye guantes y headcovers si tu classify_item los pone ahí)
+    # 5. Resumen de Apariciones: Accesorios (incluye guantes y headcovers si están clasificados así)
     summary_accessories = create_part_numbers_summary(order_meta, category_filter="Accesorios")
     if summary_accessories:
         doc.insert_pdf(summary_accessories)
-        insert_divider_page(doc, "Órdenes con Shipping Method: 2 Day") # Separador antes de lo siguiente
-
+        insert_divider_page(doc, "SH con Shipping Method: 2 Day") # Separador para la siguiente sección
+    
     # 6. Insertar página de SH 2 day
     two_day_page = create_2day_shipping_page(all_two_day)
     if two_day_page:
         doc.insert_pdf(two_day_page)
-        insert_divider_page(doc, "Listado de Pelotas por Relación") # Separador
+        insert_divider_page(doc, "Detalle por Órden") # Separador para la siguiente sección
 
-    # 7. Insertar página de Pelotas (listado de relaciones, no de apariciones)
-    pelotas_doc = create_category_table(all_relations, "Pelotas")
-    if pelotas_doc:
-        doc.insert_pdf(pelotas_doc)
-        insert_divider_page(doc, "Listado de Gorras por Relación") # Separador para la siguiente categoría
-
-    # 8. Insertar página de Gorras (listado de relaciones)
-    gorras_doc = create_category_table(all_relations, "Gorras")
-    if gorras_doc:
-        doc.insert_pdf(gorras_doc)
-        insert_divider_page(doc, "Listado de Accesorios por Relación") # Separador para la siguiente categoría
-
-    # 9. Insertar página de Accesorios (listado de relaciones)
-    accesorios_doc = create_category_table(all_relations, "Accesorios")
-    if accesorios_doc:
-        doc.insert_pdf(accesorios_doc)
-        insert_divider_page(doc, "Documentos Principales") # Separador antes de los docs originales
-
-    # Insertar páginas de órdenes
-    def insert_order_pages(order_list):
-        for oid in order_list:
-            # Insertar build pages
-            for p in build_map.get(oid, {}).get("pages", []):
-                src_page = p["parent"][p["number"]]
-                doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
-
-            # Insertar ship pages
-            for p in ship_map.get(oid, {}).get("pages", []):
-                src_page = p["parent"][p["number"]]
-                doc.insert_pdf(p["parent"], from_page=p["number"], to_page=p["number"])
-
-    # Insertar pickups primero si está habilitado
-    if pickup_flag and pickups:
-        insert_divider_page(doc, "Customer Pickup Orders")
-        insert_order_pages(pickups)
-
-    # Insertar otras órdenes
-    others = [oid for oid in build_order if oid not in pickups]
-    if others:
-        insert_divider_page(doc, "Other Orders")
-        insert_order_pages(others)
+    # Insert individual order pages
+    for oid in build_order:
+        insert_divider_page(doc, f"Orden {oid}")
+        for page_data in order_meta[oid]["pages"]:
+            page_bytes = page_data["parent"].copy_page(page_data["number"]).tobytes()
+            doc.insert_pdf(fitz.open(stream=page_bytes, filetype="pdf"))
 
     return doc
+
 
 # --- Streamlit UI ---
 st.set_page_config(layout="wide")
