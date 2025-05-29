@@ -299,7 +299,6 @@ PART_DESCRIPTIONS = {
     'H-USMC-ADJ': 'PXG USMC Unstructured Hat - Adjustable',
 
     # image_fbd658.png (Accessories)
-    'HC-JT-4623': 'Tour Series Blade Headcover - Black',
     'A-UAC18-FM': 'PXG Wedge Brush - Chrome',
     'A-UAC17-FM': 'PXG Wedge Brush - Black',
     'A-ALIGNSTICKS-WHT': 'PXG Player Alignment Sticks - White',
