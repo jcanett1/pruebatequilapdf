@@ -23,68 +23,130 @@ def extract_identifiers(text):
 def extract_part_numbers(text):
     """
     Extrae números de parte del texto.
-    Prioritiza las coincidencias más largas y asegura que un número de parte más corto
-    no se cuente si es parte de un número de parte más largo identificado
-    en la misma posición.
     Retorna un diccionario con los números de parte encontrados como claves y valor 1.
     """
-    part_counts = {}
+    part_counts = defaultdict(int)
     text_upper = text.upper()
-    all_part_keys = list(PART_DESCRIPTIONS.keys())
     
-    # Buscar coincidencias exactas definidas en PART_DESCRIPTIONS
-    for p_short in all_part_keys:
-        pattern_short = r'(?<!\w)' + re.escape(p_short) + r'(?!\w)'
-        found_standalone_match_for_p_short = False
-        for match_short in re.finditer(pattern_short, text_upper):
-            match_short_start_index = match_short.start()
-            is_this_match_shadowed_by_a_longer_one = False
-            for p_long in all_part_keys:
-                if len(p_long) > len(p_short) and \
-                   p_short == p_long[:len(p_short)] and \
-                   text_upper.startswith(p_long, match_short_start_index):
-                    end_of_p_long_index = match_short_start_index + len(p_long)
-                    is_p_long_standalone_here = False
-                    if end_of_p_long_index == len(text_upper):
-                        is_p_long_standalone_here = True
-                    else:
-                        char_after_p_long = text_upper[end_of_p_long_index]
-                        if not re.match(r'\w', char_after_p_long):
-                            is_p_long_standalone_here = True
-                    if is_p_long_standalone_here:
-                        is_this_match_shadowed_by_a_longer_one = True
-                        break
-            if not is_this_match_shadowed_by_a_longer_one:
-                found_standalone_match_for_p_short = True
-                break
-        if found_standalone_match_for_p_short:
-            part_counts[p_short] = 1
+    # Obtener todas las claves de PART_DESCRIPTIONS.
+    # Las ordenamos por longitud descendente para intentar coincidir con las más largas primero,
+    # lo cual ayuda a mitigar el problema de los prefijos sin la lógica compleja de "sombreado".
+    all_part_keys_sorted = sorted(PART_DESCRIPTIONS.keys(), key=len, reverse=True)
+
+    # Creamos un conjunto para llevar un registro de las ubicaciones ya cubiertas por
+    # una coincidencia más larga.
+    matched_ranges = []
+
+    for part_key in all_part_keys_sorted:
+        # Regex más flexible:
+        # \b al inicio para asegurar que no sea parte de una palabra anterior.
+        # re.escape(part_key) para el código exacto.
+        # (?:[A-Z0-9-]*)\b: permite que el código sea seguido por guiones o caracteres alfanuméricos
+        #                 antes de un límite de palabra. Esto es para casos como "H-XXXX-YYY"
+        #                 o "H-XXXX-123".
+        #                 Si el código en el PDF NUNCA tiene nada después y es exactamente el código,
+        #                 entonces (?:[A-Z0-9-]*)\b se puede simplificar a \b.
+        #                Pero para los códigos que mencionas, que ya tienen números y guiones,
+        #                la flexibilidad es buena.
+        # Si el código SIEMPRE debe ser EXACTO sin nada pegado al final, usa r'\b' + re.escape(part_key) + r'\b'.
+        # Si puede tener un sufijo, considera esta versión o incluso r'\b' + re.escape(part_key) + r'\S*'.
+        # Para tu caso, si H-25PXG000282-OSFM no se detecta, a menudo es el \b final.
+        # Vamos a intentar un regex más flexible para el final que permita cualquier carácter no-espacio (\S*)
+        # inmediatamente después del código, y luego veremos si eso introduce falsos positivos.
+        
+        # Opción 1 (la más segura si el código es *exacto* pero \b falla por contexto):
+        # pattern = r'(?<!\w)' + re.escape(part_key) + r'(?!\w)'
+        # Este es el que ya tenías y que debería funcionar si el código es una "palabra" exacta.
+
+        # Opción 2 (más flexible al final, útil si el código es a veces seguido por algo como un sufijo o caracter no-espacio):
+        pattern = r'\b' + re.escape(part_key) + r'\S*' # \S* permite cualquier caracter no-espacio al final
+
+        # Opción 3 (si el problema es SOLO el inicio o fin y no se espera NADA después del código):
+        # pattern = r'\b' + re.escape(part_key) # Solo limite de palabra al inicio
+
+        # Para los códigos que mencionas, 'H-23PXG0000124-2-GB-OSFM' y 'H-25PXG000282-OSFM',
+        # y la dificultad de encontrarlos, la Opción 2 con `\S*` al final es la más probable
+        # para capturarlos si están pegados a algo.
+        
+        # Sin embargo, si quieres que SÓLO coincidan con el código exacto y no con variaciones como
+        # 'H-25PXG000282-OSFM-V2', entonces la opción original `(?<!\w)' + re.escape(part_key) + r'(?!\w)'`
+        # o la `\b` + re.escape(part_key) + `\b` es la correcta, y el problema es que el PDF no
+        # tiene esos códigos como "palabras completas".
+
+        # Vamos a probar con la Opción 2 para extract_part_numbers para capturar más,
+        # y luego validaremos si esto captura los códigos que buscas.
+        pattern = r'\b' + re.escape(part_key) + r'\S*'
+
+
+        for match in re.finditer(pattern, text_upper):
+            start, end = match.span()
+            matched_text = match.group(0) # El texto que realmente coincidió con el patrón
+            
+            # Comprobar si esta coincidencia ya está dentro de un rango previamente cubierto
+            # por una coincidencia más larga.
+            is_shadowed = False
+            for prev_start, prev_end in matched_ranges:
+                if prev_start <= start < end <= prev_end: # Si esta coincidencia está dentro de una anterior
+                    is_shadowed = True
+                    break
+            
+            if not is_shadowed:
+                # Confirmar que el texto que coincidió es realmente uno de los códigos exactos
+                # o una variante aceptable (si la Opción 2 fue elegida).
+                # Aquí, queremos el CÓDIGO EXACTO de PART_DESCRIPTIONS.
+                if part_key == matched_text: # Si usamos \S*, es crucial que matched_text == part_key
+                                             # para que solo agreguemos el código exacto, no sus sufijos.
+                    part_counts[part_key] += 1
+                    # Añadir este rango a los rangos cubiertos.
+                    matched_ranges.append((start, end))
+                    # Ordenar los rangos cubiertos para una búsqueda eficiente en el futuro.
+                    # Esto puede ser costoso si hay muchas coincidencias, pero asegura la precisión.
+                    matched_ranges.sort()
+                elif matched_text.startswith(part_key) and part_key in PART_DESCRIPTIONS:
+                     # Si el patrón fue más flexible (como \S*), pero solo queremos contar el part_key exacto
+                     # y no la parte con el sufijo, entonces verificamos que el matched_text comience con part_key
+                     # y el part_key (sin sufijo) esté en PART_DESCRIPTIONS.
+                    part_counts[part_key] += 1
+                    matched_ranges.append((start, end))
+                    matched_ranges.sort()
+
 
     # === BÚSQUEDA ADICIONAL PARA GUANTES QUE COMIENZAN CON G4-6520 ===
+    # Esta sección se mantiene para las reglas específicas de guantes.
     glove_pattern = r'(G4-6520[^\s\-]*)'
     for match in re.finditer(glove_pattern, text_upper, re.IGNORECASE):
         full_glove_code = match.group(1)
         if full_glove_code in PART_DESCRIPTIONS:
-             part_counts[full_glove_code] = 1
-        
-    return part_counts
+            # Asegúrate de que no se superponga con una coincidencia principal ya encontrada
+            # (esto requeriría más lógica de `matched_ranges` para guantes si fueran problemáticos)
+            part_counts[full_glove_code] += 1
+            
+    return dict(part_counts)
+
 
 def extract_relations(text, order_id, shipment_id):
     """Extrae relaciones entre códigos, órdenes y SH"""
     relations = []
     text_upper = text.upper()
     
+    # Se utiliza la misma lógica de patrón flexible para los códigos de parte.
+    # Aquí no hay necesidad de ordenar por longitud o manejar superposiciones,
+    # ya que simplemente estamos buscando la presencia de cada código.
     for part_num in PART_DESCRIPTIONS:
-        pattern = r'(?<!\w)' + re.escape(part_num) + r'(?!\w)'
+        # Utiliza el mismo patrón flexible que en extract_part_numbers para consistencia
+        pattern = r'\b' + re.escape(part_num) + r'\S*' # \S* permite cualquier caracter no-espacio al final
+
+        # Si el código exacto aparece en el texto con o sin un sufijo no-espacio
         if re.search(pattern, text_upper) and order_id and shipment_id:
+            # Asegúrate de que el código que se añade es el KEY exacto de PART_DESCRIPTIONS
             relations.append({
                 "Orden": order_id,
-                "Código": part_num,
+                "Código": part_num, # Aquí usamos el part_num exacto de la clave
                 "Descripción": PART_DESCRIPTIONS[part_num],
                 "SH": shipment_id
             })
 
-     # Búsqueda adicional para guantes G4-6520...
+    # Búsqueda adicional para guantes G4-6520...
     glove_pattern = r'(G4-6520\S*)'
     for match in re.finditer(glove_pattern, text_upper):
         full_glove_code = match.group(1)
