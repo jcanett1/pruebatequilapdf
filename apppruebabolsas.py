@@ -183,6 +183,7 @@ PART_DESCRIPTIONS = {
     'H-22PXG000013-WHT': 'Tall Visor - White',
     'H-22PXG000014-BLK': 'Sport Visor - Black',
     'H-22PXG000014-WHT': 'Sport Visor - White',
+    'H-23PXG0000124-2-GB-OSFM': 'Dog Tag 6-Panel Snapback Cap - Grey/Black Logo - One Size',
     'H-23PXG0000124-2-BG-OSFM': 'Dog Tag 6-Panel Snapback Cap - Black/Grey Logo - One Size',
     'H-23PXG0000124-2-BW-OSFM': 'Dog Tag 6-Panel Snapback Cap - Black/White Logo - One Size',
     'H-23PXG0000124-2-CG-OSFM': 'Dog Tag 6-Panel Snapback Cap - White/Grey Logo - One Size',
