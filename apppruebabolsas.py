@@ -232,7 +232,6 @@ PART_DESCRIPTIONS = {
     'H-24PXG000277-OSFM': '2025 Stars & Stripes Dog Tag Cap - One Size',
     'H-24PXG000278-OSFM': '2025 Stars & Stripes High Crown Cap - One Size',
     'H-25PXG000282-OSFM': '2025 Stars & Stripes Trucker Cap - One Size',
-    'H-25PXG000282-OSFM': '2025 Stars & Stripes Trucker Cap - One Size',
     'H-24PXG000282-OSFM': '2025 Stars & Stripes Trucker Cap - One Size',
     'H-25PXG000283-OSFM': '2025 Stars & Stripes Dog Tag Trucker - One Size',
     'H-USMC-ADJ': 'PXG USMC Unstructured Hat - Adjustable',
