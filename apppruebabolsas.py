@@ -753,11 +753,80 @@ def create_gloves_table(relations):
 
     return doc
 
+def show_shipping_summary(order_meta):
+    """Muestra un resumen de los métodos de envío en la interfaz de Streamlit"""
+    if not isinstance(order_meta, dict):
+        st.warning("No hay datos de órdenes para mostrar métodos de envío.")
+        return
+    
+    shipping_methods = [
+        "GU 9", "PICKUP", "PO BOX",
+        "AK 9", "NO SHIPMENT", "GENERAL DELIVERY",
+        "PR 0", "HAND DELIVER",
+        "RIO BAYAMON",
+        "HI 9",
+        "OVERNIGHT",
+    ]
+    
+    # Inicializar contadores
+    shipping_counts = {method: 0 for method in shipping_methods}
+    
+    # Contar frecuencias
+    for oid, meta in order_meta.items():
+        if not isinstance(meta, dict):
+            continue
+            
+        shipping_method = str(meta.get("shipping_method", "")).upper().strip()
+        
+        if not shipping_method:
+            continue
+            
+        # Verificar cada método
+        for method in shipping_methods:
+            if method in shipping_method:
+                shipping_counts[method] += 1
+    
+    # Filtrar métodos con al menos una ocurrencia
+    shipping_counts = {k: v for k, v in shipping_counts.items() if v > 0}
+    
+    if not shipping_counts:
+        st.warning("No se encontraron datos de métodos de envío.")
+        return
+    
+    # Mostrar en Streamlit como tabla
+    st.subheader("Resumen de Métodos de Envío")
+    
+    # Agrupar métodos relacionados para mejor visualización
+    grouped_methods = [
+        ("GU 9 / PICKUP / PO BOX", ["GU 9", "PICKUP", "PO BOX"]),
+        ("AK 9 / NO SHIPMENT / GENERAL DELIVERY", ["AK 9", "NO SHIPMENT", "GENERAL DELIVERY"]),
+        ("PR 0 / HAND DELIVER", ["PR 0", "HAND DELIVER"]),
+        ("RIO BAYAMON", ["RIO BAYAMON"]),
+        ("HI 9", ["HI 9"]),
+        ("OVERNIGHT", ["OVERNIGHT"]),
+    ]
+    
+    # Crear DataFrame para mostrar en Streamlit
+    data = []
+    for group_name, methods in grouped_methods:
+        total = sum(shipping_counts.get(method, 0) for method in methods)
+        if total > 0:
+            data.append({"Grupo de Métodos": group_name, "Cantidad": total})
+    
+    if data:
+        df = pd.DataFrame(data)
+        st.dataframe(df)
+    else:
+        st.warning("No se encontraron métodos de envío registrados.")
+
+
+
+
+
 def create_shipping_methods_summary(order_meta):
-    """Crea un resumen completo de los métodos de envío y su frecuencia"""
+    """Crea un resumen completo de los métodos de envío y su frecuencia para PDF"""
     doc = fitz.open()
     
-    # Métodos de envío a incluir (según lo que mencionaste)
     shipping_methods = [
         "GU 9", "PICKUP", "PO BOX",
         "AK 9", "NO SHIPMENT", "GENERAL DELIVERY",
@@ -798,26 +867,13 @@ def create_shipping_methods_summary(order_meta):
     page = doc.new_page()
     
     # Título principal
-    title = "Resumen de Órdenes y Envíos"
+    title = "Resumen de Métodos de Envío"
     title_rect = fitz.Rect(50, 30, 550, 80)
     page.insert_textbox(title_rect, title, 
                       fontsize=18, 
                       align=fitz.TEXT_ALIGN_CENTER,
                       fontname="helv",
-                      fontfile=None,
                       color=(0, 0, 0))
-    
-    # Subtítulo
-    subtitle = "Métodos de Envío Utilizados"
-    subtitle_rect = fitz.Rect(50, 80, 550, 110)
-    page.insert_textbox(subtitle_rect, subtitle, 
-                       fontsize=14, 
-                       align=fitz.TEXT_ALIGN_CENTER,
-                       fontname="helv",
-                       color=(0.2, 0.2, 0.2))
-    
-    # Crear tabla de datos
-    table_data = [["Método de Envío", "Cantidad"]]
     
     # Agrupar métodos relacionados
     grouped_methods = [
@@ -829,14 +885,17 @@ def create_shipping_methods_summary(order_meta):
         ("OVERNIGHT", ["OVERNIGHT"]),
     ]
     
+    # Crear tabla de datos
+    table_data = [["Método de Envío", "Cantidad"]]
+    
     for group_name, methods in grouped_methods:
         total = sum(shipping_counts.get(method, 0) for method in methods)
         if total > 0:
             table_data.append([group_name, str(total)])
     
-    # Añadir tabla al PDF
-    if len(table_data) > 1:  # Si hay datos para mostrar
-        tab_rect = fitz.Rect(50, 120, 550, 700)
+    # Añadir tabla al PDF si hay datos
+    if len(table_data) > 1:
+        tab_rect = fitz.Rect(50, 100, 550, 700)
         table = page.new_table()
         table.set_data(table_data)
         
@@ -902,10 +961,10 @@ def merge_documents(build_order, build_map, ship_map, order_meta, pickup_flag, a
         doc.insert_pdf(summary_gloves)
         insert_divider_page(doc, "Listado de Pelotas por Relación")
 
-    # NUEVA SECCIÓN: Resumen de métodos de envío
+     # NUEVA SECCIÓN: Resumen de métodos de envío
     if isinstance(order_meta, dict):
         shipping_summary = create_shipping_methods_summary(order_meta)
-        if shipping_summary:
+        if shipping_summary.page_count > 0:  # Verificar que tiene páginas
             doc.insert_pdf(shipping_summary)
             insert_divider_page(doc, "Órdenes con Shipping Method: 2 Day")
 
