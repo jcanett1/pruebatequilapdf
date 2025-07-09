@@ -232,6 +232,7 @@ PART_DESCRIPTIONS = {
     'B-PG-245-WHT': 'Deluxe Cart Bag B2 - White',
     'B-PG-246-POLY': 'Minimalist Carry Stand Bag - Black',
     'B-UGB8-EP': '2020 Carry Stand Bag - Black',
+    'B-UGB14-FM': 'PXG Sunday Stand Bag - Black/White',
 
     # --- CÓDIGOS DE LAS IMÁGENES ---
    # image_fbd711.png (Golf Balls)
