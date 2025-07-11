@@ -233,7 +233,7 @@ PART_DESCRIPTIONS = {
     'B-PG-246-POLY': 'Minimalist Carry Stand Bag - Black',
     'B-UGB8-EP': '2020 Carry Stand Bag - Black',
     'B-UGB14-FM': 'PXG Sunday Stand Bag - Black/White',
-    'B-UGB2-EP 2020': 'Tour Bag- Black',
+    'B-UGB2-EP': '2020 Tour Bag- Black',
     'B-UGB13-EP-B': 'Den Caddy- Black',
 
     # --- CÓDIGOS DE LAS IMÁGENES ---
